@@ -6,21 +6,36 @@ import (
 	"os/signal"
 	"syscall"
 
-	"Galileu/internal/guardian" 
+	"Galileu/internal/guardian"
 )
 
 func main() {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	fmt.Println(`
+                                                                                                                                             
+                       (     (    (                 
+ (        (      )\ )  )\ ) )\ )              
+ )\ )     )\    (()/( (()/((()/(  (       (   
+(()/(  ((((_)(   /(_)) /(_))/(_)) )\      )\  
+ /(_))_ )\ _ )\ (_))  (_)) (_))  ((_)  _ ((_) 
+(_)) __|(_)_\(_)| |   |_ _|| |   | __|| | | | 
+  | (_ | / _ \  | |__  | | | |__ | _| | |_| | 
+   \___|/_/ \_\ |____||___||____||___| \___/  
+                                                   
+                       
+    `)
 
-	go func() {
-		<-sigChan
-		fmt.Println("\n[GALILEU] Encerrando o proxy MITM...")
-		os.Exit(0)
-	}()
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	fmt.Println("[GALILEU] Iniciando Proxy MITM para monitoramento de LLMs (macOS)...")
-	fmt.Println("[INFO] Certifique-se de iniciar a IDE/OpenCode apontando para http://127.0.0.1:9000")
+	go guardian.GracefulListen()
 
-	guardian.StartGuardian()
+	fmt.Println("[GALILEU] Proxy ativo na porta 9000.")
+	fmt.Println("[GALILEU] Pressione Ctrl+C para encerrar e persistir o log de auditoria.")
+
+	<-quit
+	fmt.Println("\n[GALILEU] Encerrando...")
+	guardian.CloseGuardian()
+	guardian.CloseAuditLogger()
+	fmt.Println("[GALILEU] Log de auditoria persistido com sucesso.")
 }
+

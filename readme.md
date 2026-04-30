@@ -80,6 +80,7 @@ Para que o proxy MITM funcione correctamente com HTTPS **sem emitir avisos de se
 4. Expanda a secção **Confiar** (Trust).
 5. Defina **Ao usar este certificado** como **Confiar Sempre** (Always Trust).
 6. Feche a janela e introduza a sua palavra-passe de sistema quando solicitado.
+ 
 ### Passo 2 — Executar o Galileu
  
 Abra o Terminal na raiz do projecto e execute:
@@ -92,8 +93,12 @@ O programa irá:
  
 - Carregar os certificados locais (`ca.pem` e `key.pem`).
 - Iniciar o proxy na porta **9000**.
-- Activar o registo (logging) de auditoria.
+- Activar o registo (logging) de auditoria expandido.
+- Inicializar o worker pool de logs (4 workers assíncronos).
+
 > Não são necessários privilégios `sudo` para a porta 9000.
+> 
+> Ao encerrar com `Ctrl+C`, o Galileu executa um **graceful shutdown**, garantindo que todos os logs sejam persistidos antes do encerramento.
  
 ### Passo 3 — Configurar o OpenCode
  
@@ -120,7 +125,7 @@ opencode
 A partir deste momento, **todas as requisições do OpenCode** para os provedores de IA passarão pelo proxy Galileu, que irá:
  
 - Detectar e remover dados sensíveis automaticamente.
-- Registar cada requisição para auditoria.
+- Registar cada requisição com métricas detalhadas para auditoria.
 ---
  
 ## Hosts Monitorizados
@@ -140,7 +145,7 @@ O Galileu intercepta requisições para os seguintes provedores:
  
 ## Detecção de Dados Sensíveis
  
-O **Analyzer** detecta e sanitiza automaticamente os seguintes padrões:
+O **Analyzer** detecta e sanitiza automaticamente os seguintes padrões, retornando o **tipo de padrão** e a **posição de redação** em cada requisição:
  
 | Tipo | Padrão | Exemplo |
 |---|---|---|
@@ -151,18 +156,90 @@ O **Analyzer** detecta e sanitiza automaticamente os seguintes padrões:
 | GitHub Token | `ghp_...` | `ghp_abcdef123456...` |
 | Slack / Discord | `xox[baprs]-...` | `xoxb-123456...` |
 | AWS Access Key | `AKIA...` | `AKIAIOSFODNN7...` |
+| AWS Secret Key | `wJalr...` | `wJalrXUtnFEM...` |
+| Bearer Token | `bearer ...` | `bearer abcdef123456...` |
+| Generic API Key | `api_key...` | `api_keyABC123...` |
  
 Todos os dados sensíveis detectados são substituídos por `[REDACTED_BY_GALILEU]`.
  
 ---
  
-## Registos de Auditoria
+## Registos de Auditoria Expandidos
  
-O ficheiro `galileu_audit.log` contém um registo JSON de cada requisição interceptada:
+O ficheiro `galileu_audit.log` contém um registo JSON detalhado de cada requisição interceptada, com métricas expandidas para análise de segurança e governança:
+ 
+### Campos de Identidade
+| Campo | Descrição |
+|---|---|
+| `request_id` | UUID v4 gerado por requisição — permite correlacionar entradas de uma mesma transação |
+| `session_id` | Identificador gerado no boot do Galileu — agrupa logs por sessão de uso |
+| `machine_id` | Hash SHA-256 (12 chars) do hostname — segmenta logs por utilizador sem dados pessoais |
+ 
+### Detalhamento da Detecção
+| Campo | Descrição |
+|---|---|
+| `detected_patterns` | Array com os tipos de padrão detectados (ex: `"openai_key"`, `"github_token"`) |
+| `pattern_count` | Total de ocorrências redatadas naquela requisição |
+| `redaction_positions` | Campos do JSON onde a detecção ocorreu (ex: `"body"`) |
+ 
+### Volume e Payload
+| Campo | Descrição |
+|---|---|
+| `request_body_size_bytes` | Tamanho em bytes do payload antes da sanitização |
+| `response_body_size_bytes` | Tamanho em bytes da resposta do provider |
+| `model` | Modelo LLM extraído da requisição (ex: `"gpt-4o"`, `"claude-3-5-sonnet"`) |
+| `provider` | Provider normalizado (ex: `"openai"`, `"anthropic"`, `"google"`) |
+ 
+### Performance do Proxy
+| Campo | Descrição |
+|---|---|
+| `proxy_latency_ms` | Tempo total em ms desde o recebimento até o repasse ao provider |
+| `analysis_duration_ms` | Tempo exclusivo em ms da etapa de análise e sanitização |
+ 
+### Resultado
+| Campo | Descrição |
+|---|---|
+| `response_status_code` | HTTP status code retornado pelo provider |
+| `proxy_error` | Indica se houve erro interno no processamento |
+| `error_message` | Mensagem de erro quando `proxy_error` é verdadeiro |
+| `was_blocked` | Indica se a requisição foi bloqueada (reservado para implementação futura) |
+ 
+### Contexto da Conversa LLM
+| Campo | Descrição |
+|---|---|
+| `message_count` | Número de mensagens no array `"messages"` da requisição |
+| `has_system_prompt` | `true` se houver campo `"system"` ou role `"system"` |
+| `stream` | Valor do campo `"stream"` na requisição |
+ 
+### Exemplo de Entrada no Log
  
 ```json
-{"timestamp":"2026-04-29T10:00:00Z","host":"opencode.ai","path":"/v1/chat/completions","method":"POST","redacted":true,"pattern_type":"sensitive_data"}
-{"timestamp":"2026-04-29T10:05:00Z","host":"api.openai.com","path":"/v1/chat/completions","method":"POST","redacted":false,"pattern_type":""}
+{
+  "timestamp": "2026-04-30T10:00:00Z",
+  "request_id": "f3a1b2c4-7e6d-4a1b-9c3f-1234567890ab",
+  "session_id": "a1b2c3d4",
+  "machine_id": "3f9a12bc4d1e",
+  "host": "api.openai.com",
+  "provider": "openai",
+  "path": "/v1/chat/completions",
+  "method": "POST",
+  "model": "gpt-4o",
+  "redacted": true,
+  "pattern_count": 2,
+  "detected_patterns": ["openai_key", "github_token"],
+  "redaction_positions": ["body"],
+  "has_system_prompt": true,
+  "message_count": 5,
+  "stream": true,
+  "request_body_size_bytes": 4200,
+  "response_body_size_bytes": 0,
+  "response_status_code": 200,
+  "proxy_latency_ms": 143,
+  "analysis_duration_ms": 4,
+  "proxy_error": false,
+  "error_message": "",
+  "was_blocked": false
+}
 ```
  
 ---
@@ -188,6 +265,8 @@ Os testes foram realizados com sucesso. As imagens de comprovação encontram-se
 | `ghp_...` (GitHub) | ✅ `[REDACTED_BY_GALILEU]` | Detectado |
 | `xoxb-...` (Slack/Discord) | ✅ `[REDACTED_BY_GALILEU]` | Detectado |
 | `AKIA...` (AWS Key) | ✅ `[REDACTED_BY_GALILEU]` | Detectado |
+| `wJalr...` (AWS Secret) | ✅ `[REDACTED_BY_GALILEU]` | Detectado |
+| `api_key...` (Generic) | ✅ `[REDACTED_BY_GALILEU]` | Detectado |
  
 ---
  
@@ -195,10 +274,13 @@ Os testes foram realizados com sucesso. As imagens de comprovação encontram-se
  
 O Galileu foi optimizado para ambientes de desenvolvimento:
  
-- **Goroutines** — Cada requisição é processada na sua própria goroutine.
-- **Buffer Pooling** — Reutilização de memória com `sync.Pool`.
-- **Regex Pré-compilado** — Padrões de detecção compilados na inicialização.
-- **Processamento Assíncrono** — Logging não bloqueante.
+- **Log Worker Pool** — 4 workers assíncronos dedicados ao processamento de logs, com canal buffered (100).
+- **Buffer Pooling** — Reutilização de memória com `sync.Pool` (32KB por buffer).
+- **Regex Pré-compilado** — Padrões de detecção compilados na inicialização, com tipagem nomeada.
+- **Graceful Shutdown** — Encerramento controlado que persiste todos os logs pendentes.
+- **UUID Generation** — `request_id` único por requisição via `crypto/rand`.
+- **Session/Machine ID** — Identificadores persistentes por sessão e máquina.
+ 
 ---
  
 ## Resolução de Problemas
@@ -226,11 +308,11 @@ O certificado CA (`ca.pem`) deve constar no **Acesso às Chaves (Keychain Access
 ## Arquitectura do Código
  
 ```
-cmd/sentinel/main.go      # Ponto de entrada do sistema
+cmd/sentinel/main.go      # Ponto de entrada, graceful shutdown
 internal/guardian/
-  ├── guardian.go         # Configuração do proxy MITM e carregamento de PEM
-  ├── analyzer.go         # Detecção e sanitização de dados sensíveis
-  └── audit.go            # Sistema de registo de auditoria
+  ├── guardian.go         # Proxy MITM, LogWorkerPool, extractPayloadInfo, inferProvider, setCA
+  ├── analyzer.go         # Detecção tipada (AnalysisResult), PatternInfo, sanitização
+  └── audit.go            # AuditEntry expandido, session_id, machine_id, LogAudit
 ```
  
 ---
@@ -240,6 +322,8 @@ internal/guardian/
 - A chave privada (`key.pem`) deve ser mantida em estrita segurança na máquina local.
 - **Nunca** efectue commit dos ficheiros `.pem` para o repositório — confirme que o `.gitignore` está actualizado.
 - O proxy actua exclusivamente sobre as ferramentas que configurarem explicitamente a porta **9000**.
+- Os `detected_patterns` identificam exactamente quais tipos de segredos foram encontrados em cada requisição.
+ 
 ---
  
 ## Licença
