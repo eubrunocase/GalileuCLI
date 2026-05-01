@@ -130,17 +130,135 @@ var (
 	shutdownChan  chan struct{}
 )
 
+func GracefulListenWithCA(certPEM, keyPEM []byte) {
+	proxy := goproxy.NewProxyHttpServer()
+
+	setCA(certPEM, keyPEM)
+
+	if err := InitAuditLogger(); err != nil {
+		fmt.Printf("[GALILEU] Aviso: Nao foi possivel iniciar auditoria: %v\n", err)
+	}
+	defer CloseAuditLogger()
+
+	logWorkerPool = NewLogWorkerPool(4, 100)
+	logWorkerPool.Start()
+	defer logWorkerPool.Shutdown()
+
+	analyzer := NewAnalyzer()
+
+	targetHosts := []string{
+		"opencode.ai",
+		"api.openai.com",
+		"api.anthropic.com",
+		"generativelanguage.googleapis.com",
+		"api.cohere.ai",
+		"api.mistral.ai",
+	}
+
+	processRequest := func(r *http.Request) (*http.Request, *http.Response) {
+		if r.Body == nil {
+			return r, nil
+		}
+
+		startTime := time.Now()
+
+		bufRaw := bodyPool.Get().([]byte)
+		buf := bufRaw[:0]
+		defer bodyPool.Put(buf)
+
+		body := bytes.NewBuffer(buf)
+		_, err := io.Copy(body, r.Body)
+		if err != nil {
+			return r, nil
+		}
+		bodyBytes := body.Bytes()
+
+		analysisStart := time.Now()
+		result := analyzer.Analyze(bodyBytes)
+		analysisDurationMs := int(time.Since(analysisStart).Milliseconds())
+
+		host, path, method := r.Host, r.URL.Path, r.Method
+		provider := inferProvider(host)
+
+		payloadInfo := extractPayloadInfo(bodyBytes)
+
+		logWorkerPool.Submit(LogRequest{
+			RequestID: generateUUID(),
+			Host:      host,
+			Provider:  provider,
+			Path:      path,
+			Method:    method,
+			Model:     payloadInfo.model,
+
+			Redacted:           result.Modified,
+			PatternCount:       result.PatternCount,
+			DetectedPatterns:   result.DetectedPatterns,
+			RedactionPositions: result.RedactionPositions,
+
+			MessageCount:    payloadInfo.messageCount,
+			HasSystemPrompt: payloadInfo.hasSystemPrompt,
+			Stream:          payloadInfo.stream,
+
+			RequestBodySizeBytes:  len(bodyBytes),
+			ResponseBodySizeBytes: 0,
+
+			ProxyLatencyMs:     int(time.Since(startTime).Milliseconds()),
+			AnalysisDurationMs: analysisDurationMs,
+		})
+
+		if result.Modified {
+			fmt.Printf("[GALILEU] Interceptado em %s: Dados sensiveis removidos.\n", r.Host)
+			r.Body = io.NopCloser(bytes.NewReader(result.Result))
+			r.ContentLength = int64(len(result.Result))
+			r.Header.Set("Content-Length", fmt.Sprintf("%d", len(result.Result)))
+		} else {
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
+
+		return r, nil
+	}
+
+	for _, host := range targetHosts {
+		h := host
+		proxy.OnRequest(goproxy.DstHostIs(h)).DoFunc(
+			func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+				fmt.Printf("[DEBUG] Requisicao capturada para: %s\n", r.Host)
+				return processRequest(r)
+			},
+		)
+	}
+
+	proxy.OnRequest().DoFunc(
+		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+			fmt.Printf("[DEBUG] Requisicao recebida: %s %s\n", r.Method, r.Host)
+			return r, nil
+		},
+	)
+
+	fmt.Println("[GALILEU] Proxy MITM Ativo na porta 9000...")
+	shutdownChan = make(chan struct{})
+
+	srv := &http.Server{Addr: ":9000", Handler: proxy}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Printf("[GALILEU] Erro no servidor: %v\n", err)
+		}
+	}()
+
+	<-shutdownChan
+}
+
 func GracefulListen() {
 	proxy := goproxy.NewProxyHttpServer()
 
-	caCert, err := os.ReadFile("ca.pem")
+	caCert, err := os.ReadFile("galileu-ca.pem")
 	if err != nil {
-		fmt.Printf("[GALILEU] Erro ao ler ca.pem: %v\n", err)
+		fmt.Printf("[GALILEU] Erro ao ler galileu-ca.pem: %v\n", err)
 		return
 	}
-	caKey, err := os.ReadFile("key.pem")
+	caKey, err := os.ReadFile("galileu-ca-key.pem")
 	if err != nil {
-		fmt.Printf("[GALILEU] Erro ao ler key.pem: %v\n", err)
+		fmt.Printf("[GALILEU] Erro ao ler galileu-ca-key.pem: %v\n", err)
 		return
 	}
 
@@ -294,14 +412,14 @@ func setCA(caCert, caKey []byte) {
 func StartGuardian() {
 	proxy := goproxy.NewProxyHttpServer()
 
-	caCert, err := os.ReadFile("ca.pem")
+	caCert, err := os.ReadFile("galileu-ca.pem")
 	if err != nil {
-		fmt.Printf("[GALILEU] Erro ao ler ca.pem: %v\n", err)
+		fmt.Printf("[GALILEU] Erro ao ler galileu-ca.pem: %v\n", err)
 		return
 	}
-	caKey, err := os.ReadFile("key.pem")
+	caKey, err := os.ReadFile("galileu-ca-key.pem")
 	if err != nil {
-		fmt.Printf("[GALILEU] Erro ao ler key.pem: %v\n", err)
+		fmt.Printf("[GALILEU] Erro ao ler galileu-ca-key.pem: %v\n", err)
 		return
 	}
 

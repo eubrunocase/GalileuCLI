@@ -28,14 +28,42 @@
  
 ---
  
+## Instalação Rápida (Recomendado)
+
+O Galileu agora gera e instala o certificado CA **automaticamente** na primeira execução. Não é mais necessário criar ou importar certificados manualmente.
+
+### Opção 1 — Script de Setup Automático
+
+```bash
+./scripts/setup-galileu.sh
+```
+
+Este script irá:
+1. Verificar se o Go está instalado
+2. Compilar o Galileu para sua arquitetura
+3. Gerar o certificado CA automaticamente
+4. Instalar o certificado no Keychain do sistema (será solicitada a senha de administrador)
+
+### Opção 2 — Execução Direta
+
+Basta compilar e executar. O certificado será gerado e instalado automaticamente:
+
+```bash
+go build -o galileu ./cmd/sentinel/main.go
+./galileu
+```
+
+> **Nota:** Na primeira execução, será solicitada a senha de administrador para instalar o certificado CA no Keychain do sistema. Esta etapa é necessária para que o proxy MITM funcione com HTTPS.
+
+---
+ 
 ## Pré-requisitos
  
 | Requisito | Detalhe |
 |---|---|
 | **Sistema Operativo** | macOS — compatível com Apple Silicon (M1/M2/M3) e arquitetura Intel |
 | **Go** | Versão 1.23 ou superior (necessário apenas para compilação) |
-| **Certificados** | Ficheiros `ca.pem` e `key.pem` gerados e colocados na raiz do projeto |
-| **Privilégios** | Não requer `sudo` para execução na porta 9000 |
+| **Privilégios** | `sudo` necessário apenas na **primeira execução** para instalar o certificado CA |
  
 ---
  
@@ -59,48 +87,46 @@ GOOS=darwin GOARCH=amd64 go build -o galileu ./cmd/sentinel/main.go
  
 ```
 Galileu/
-├── galileu              # Executável principal (macOS)
-├── ca.pem               # Certificado CA público (exportado do Acesso às Chaves)
-├── key.pem              # Chave privada do CA (⚠️ NÃO submeter para o repositório)
-├── start-opencode.sh    # Script shell para iniciar o OpenCode com proxy
-└── galileu_audit.log    # Registo de auditoria (gerado automaticamente)
+├── galileu                  # Executável principal (macOS)
+├── galileu-ca.pem           # Certificado CA gerado automaticamente
+├── galileu-ca-key.pem       # Chave privada do CA (⚠️ NÃO submeter para o repositório)
+├── scripts/
+│   └── setup-galileu.sh     # Script de setup inicial automatizado
+├── start-opencode.sh        # Script shell para iniciar o OpenCode com proxy
+└── galileu_audit.log        # Registo de auditoria (gerado automaticamente)
 ```
  
 ---
  
 ## Como Utilizar
  
-### Passo 1 — Configurar o Certificado CA no macOS
- 
-Para que o proxy MITM funcione correctamente com HTTPS **sem emitir avisos de segurança**, o certificado `ca.pem` deve ser adicionado ao **Acesso às Chaves (Keychain Access)** do macOS e definido como confiável:
- 
-1. Abra o **Acesso às Chaves** (Keychain Access).
-2. Arraste o ficheiro `ca.pem` para a lista de certificados, ou use **Ficheiro > Importar Itens**.
-3. Clique duas vezes no certificado importado.
-4. Expanda a secção **Confiar** (Trust).
-5. Defina **Ao usar este certificado** como **Confiar Sempre** (Always Trust).
-6. Feche a janela e introduza a sua palavra-passe de sistema quando solicitado.
- 
-### Passo 2 — Executar o Galileu
- 
+### Passo 1 — Executar o Galileu
+
 Abra o Terminal na raiz do projecto e execute:
  
 ```bash
 ./galileu
 ```
  
-O programa irá:
- 
-- Carregar os certificados locais (`ca.pem` e `key.pem`).
+Na **primeira execução**, o Galileu irá:
+
+- Gerar automaticamente um certificado CA (`galileu-ca.pem` e `galileu-ca-key.pem`).
+- Instalar o certificado no Keychain do sistema (será solicitada a senha via `sudo`).
 - Iniciar o proxy na porta **9000**.
 - Activar o registo (logging) de auditoria expandido.
 - Inicializar o worker pool de logs (4 workers assíncronos).
+
+Nas **execuções seguintes**, o Galileu reutilizará o certificado existente:
+
+- Carregar os certificados locais (`galileu-ca.pem` e `galileu-ca-key.pem`).
+- Verificar se o certificado está confiado no Keychain.
+- Iniciar o proxy normalmente.
 
 > Não são necessários privilégios `sudo` para a porta 9000.
 > 
 > Ao encerrar com `Ctrl+C`, o Galileu executa um **graceful shutdown**, garantindo que todos os logs sejam persistidos antes do encerramento.
  
-### Passo 3 — Configurar o OpenCode
+### Passo 2 — Configurar o OpenCode
  
 Num **novo Terminal**, dê permissão de execução ao script e execute-o:
  
@@ -120,12 +146,13 @@ opencode
  
 > **Nota:** Se o comando `opencode` não funcionar nativamente, substitua-o por `open -a "Visual Studio Code"` no seu script.
  
-### Passo 4 — Utilizar o OpenCode normalmente
+### Passo 3 — Utilizar o OpenCode normalmente
  
 A partir deste momento, **todas as requisições do OpenCode** para os provedores de IA passarão pelo proxy Galileu, que irá:
  
 - Detectar e remover dados sensíveis automaticamente.
 - Registar cada requisição com métricas detalhadas para auditoria.
+
 ---
  
 ## Hosts Monitorizados
@@ -280,14 +307,23 @@ O Galileu foi optimizado para ambientes de desenvolvimento:
 - **Graceful Shutdown** — Encerramento controlado que persiste todos os logs pendentes.
 - **UUID Generation** — `request_id` único por requisição via `crypto/rand`.
 - **Session/Machine ID** — Identificadores persistentes por sessão e máquina.
+- **CA Auto-Generation** — Certificado RSA 4096-bit gerado automaticamente, válido por 10 anos.
  
 ---
  
 ## Resolução de Problemas
  
-### "Falha ao carregar certificados"
+### "Falha ao garantir o certificado CA"
+
+O Galileu não conseguiu gerar ou ler o certificado. Tente remover os ficheiros `galileu-ca.pem` e `galileu-ca-key.pem` e executar novamente. O certificado será regenerado automaticamente.
  
-Verifique se exportou correctamente a chave e o certificado do **Acesso às Chaves** para os ficheiros `ca.pem` e `key.pem`, e confirme que ambos se encontram na raiz do directório onde está a executar o comando.
+### "Não foi possível instalar o certificado automaticamente"
+
+Verifique se inseriu correctamente a senha de administrador. Pode instalar manualmente com:
+
+```bash
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain galileu-ca.pem
+```
  
 ### OpenCode não conecta ao proxy
  
@@ -301,26 +337,33 @@ O resultado deve ser: `http://127.0.0.1:9000`
  
 ### Erros de certificado SSL/TLS no cliente
  
-O certificado CA (`ca.pem`) deve constar no **Acesso às Chaves (Keychain Access)** do macOS com a confiança definida como **Confiar Sempre** (Always Trust). Consulte o Passo 1 para instruções detalhadas.
+O certificado CA (`galileu-ca.pem`) deve constar no **Acesso às Chaves (Keychain Access)** do macOS com a confiança definida como **Confiar Sempre** (Always Trust).
+
+Verifique no Keychain Access se o certificado **Galileu Local CA** está presente e confiado.
  
 ---
  
 ## Arquitectura do Código
  
 ```
-cmd/sentinel/main.go      # Ponto de entrada, graceful shutdown
-internal/guardian/
-  ├── guardian.go         # Proxy MITM, LogWorkerPool, extractPayloadInfo, inferProvider, setCA
-  ├── analyzer.go         # Detecção tipada (AnalysisResult), PatternInfo, sanitização
-  └── audit.go            # AuditEntry expandido, session_id, machine_id, LogAudit
+cmd/sentinel/main.go      # Ponto de entrada, auto-generação e instalação do CA
+internal/
+  ├── ca/
+  │   ├── ca.go           # Geração programática do certificado CA (RSA 4096)
+  │   └── install_darwin.go # Instalação automática no Keychain do macOS
+  └── guardian/
+      ├── guardian.go     # Proxy MITM, LogWorkerPool, extractPayloadInfo, inferProvider
+      ├── analyzer.go     # Detecção tipada (AnalysisResult), PatternInfo, sanitização
+      └── audit.go        # AuditEntry expandido, session_id, machine_id, LogAudit
 ```
  
 ---
  
 ## Segurança
  
-- A chave privada (`key.pem`) deve ser mantida em estrita segurança na máquina local.
+- A chave privada (`galileu-ca-key.pem`) é gerada localmente e **nunca** sai da sua máquina.
 - **Nunca** efectue commit dos ficheiros `.pem` para o repositório — confirme que o `.gitignore` está actualizado.
+- O certificado CA é válido por **10 anos** e utiliza chave **RSA 4096-bit**.
 - O proxy actua exclusivamente sobre as ferramentas que configurarem explicitamente a porta **9000**.
 - Os `detected_patterns` identificam exactamente quais tipos de segredos foram encontrados em cada requisição.
  

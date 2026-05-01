@@ -1,4 +1,9 @@
 pk.p12
 ca.pem
 key.pem
+galileu-ca.pem
+galileu-ca-key.pem
+galileu_audit.log
+galileu
+galileu.exe
 
