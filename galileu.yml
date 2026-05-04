@@ -1,0 +1,77 @@
+# ════════════════════════════════════════════════════════════════════
+# galileu.yml — Configuração do Analyzer de Dados Sensíveis
+#
+# Este ficheiro controla o comportamento do Galileu.
+# Não é necessário tocar no código Go para alterar os padrões de detecção.
+#
+# TIPOS DE PADRÃO CUSTOM:
+#   type: regex   → O campo 'pattern' aceita uma expressão regular
+#   type: literal → O campo 'values' aceita uma lista de strings exactas
+# ════════════════════════════════════════════════════════════════════════════
+
+analyzer:
+
+  # ─── Padrões embutidos ─────────────────────────────────────────────────
+  built_in:
+    openai_key:         true
+    openai_project_key: true
+    anthropic_key:      true
+    google_key:         true
+    github_token:       true
+    slack_token:        true
+    discord_token:      true
+    aws_key:            true
+
+  # ─── Padrões personalizados ──────────────────────────────────────────────
+  # Para activar, mude enabled: false para enabled: true
+  custom_patterns:
+
+    # Detectar passwords de base de dados em variáveis de ambiente
+    - name: "Password de Base de Dados"
+      type: regex
+      pattern: 'DB_PASSWORD\s*=\s*[\x27]?[^\s\x27]+'
+      label: "[DB_PASSWORD_REDACTED]"
+      enabled: true
+
+    # Detectar connection strings completas (Postgres, MySQL, MongoDB)
+    - name: "Connection String de Base de Dados"
+      type: regex
+      pattern: '(postgres|postgresql|mysql|mongodb|redis)://[^\s]+'
+      label: "[CONNECTION_STRING_REDACTED]"
+      enabled: true
+
+    # Detectar nomes de tabelas internas da empresa
+    - name: "Tabelas Internas"
+      type: literal
+      values:
+        - "clientes_vip"
+        - "transacoes_internas"
+        - "dados_financeiros_2024"
+        - "relatorio_executivo"
+      label: "[INTERNAL_TABLE_REDACTED]"
+      enabled: true
+
+    # Detectar nomes de projectos ou operações confidenciais
+    - name: "Projectos Confidenciais"
+      type: literal
+      values:
+        - "Operação Phoenix"
+        - "Projecto Stargate"
+        - "Iniciativa Alpha"
+        - "Missão Especial 2024"
+      label: "[CONFIDENTIAL_PROJECT_REDACTED]"
+      enabled: true
+
+    # Detectar tokens JWT
+    - name: "JWT Token"
+      type: regex
+      pattern: 'eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'
+      label: "[JWT_REDACTED]"
+      enabled: true
+
+    # Detectar chaves privadas SSH/RSA
+    - name: "Chave Privada"
+      type: regex
+      pattern: '-----BEGIN.*PRIVATE KEY-----'
+      label: "[PRIVATE_KEY_REDACTED]"
+      enabled: true

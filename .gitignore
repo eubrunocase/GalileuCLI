@@ -4,9 +4,6 @@
 *.crt
 pk.p12
 
-# Configuração local (pode conter termos confidenciais)
-galileu.yml
-
 # Binários compilados
 galileu
 galileu.exe
