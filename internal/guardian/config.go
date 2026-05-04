@@ -86,13 +86,13 @@ var builtInDefinitions = []struct {
 	{
 		name:      "google_key",
 		enabledFn: func(b BuiltInConfig) bool { return b.GoogleKey },
-		pattern:   `AIzaSy[a-zA-Z0-9_-]{35}`,
+		pattern:   `AIzaSy[a-zA-Z0-9_-]{20,}`,
 		label:     "[REDACTED_BY_GALILEU]",
 	},
 	{
 		name:      "github_token",
 		enabledFn: func(b BuiltInConfig) bool { return b.GitHubToken },
-		pattern:   `ghp_[a-zA-Z0-9]{36}`,
+		pattern:   `ghp_[a-zA-Z0-9]{20,}`,
 		label:     "[REDACTED_BY_GALILEU]",
 	},
 	{
@@ -111,6 +111,12 @@ var builtInDefinitions = []struct {
 		name:      "aws_access_key",
 		enabledFn: func(b BuiltInConfig) bool { return b.AWSKey },
 		pattern:   `AKIA[0-9A-Z]{16}`,
+		label:     "[REDACTED_BY_GALILEU]",
+	},
+	{
+		name:      "aws_secret_key",
+		enabledFn: func(b BuiltInConfig) bool { return b.AWSKey },
+		pattern:   `wJalr[a-zA-Z0-9/+=]{20,}`,
 		label:     "[REDACTED_BY_GALILEU]",
 	},
 }

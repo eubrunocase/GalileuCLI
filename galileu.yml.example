@@ -1,4 +1,4 @@
-# ═══════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════
 # galileu.yml — Configuração do Analyzer de Dados Sensíveis
 #
 # Este ficheiro controla o comportamento do Galileu.
@@ -7,11 +7,11 @@
 # TIPOS DE PADRÃO CUSTOM:
 #   type: regex   → O campo 'pattern' aceita uma expressão regular
 #   type: literal → O campo 'values' aceita uma lista de strings exactas
-# ═══════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════
 
 analyzer:
 
-  # ─── Padrões embutidos ───────────────────────────────────────────────────────
+  # ─── Padrões embutidos ─────────────────────────────────────────────────
   # Activar (true) ou desactivar (false) cada padrão built-in individualmente.
   built_in:
     openai_key:         true
@@ -23,7 +23,7 @@ analyzer:
     discord_token:      true
     aws_key:            true
 
-  # ─── Padrões personalizados ──────────────────────────────────────────────────
+  # ─── Padrões personalizados ──────────────────────────────────────────────
   # Adicionar quantos padrões forem necessários.
   # Cada padrão tem um nome descritivo, um tipo, e um label de substituição.
   custom_patterns:
@@ -31,14 +31,14 @@ analyzer:
     # Exemplo: Detectar passwords de base de dados em variáveis de ambiente
     - name: "Password de Base de Dados"
       type: regex
-      pattern: "DB_PASSWORD\\s*[=:]\\s*[\"']?([^\\s\"'<>]+)"
+      pattern: 'DB_PASSWORD\s*[=:]\s*["\']?([^\s"\'<>]+)'
       label: "[DB_PASSWORD_REDACTED]"
       enabled: false   # Mudar para true para activar
 
     # Exemplo: Detectar connection strings completas (Postgres, MySQL, MongoDB)
     - name: "Connection String de Base de Dados"
       type: regex
-      pattern: "(postgres|postgresql|mysql|mongodb|redis)://[^\\s\"'<>]+"
+      pattern: '(postgres|postgresql|mysql|mongodb|redis):\/\/[^\s"\'<>]+'
       label: "[CONNECTION_STRING_REDACTED]"
       enabled: false
 
@@ -63,13 +63,13 @@ analyzer:
     # Exemplo: Detectar tokens JWT
     - name: "JWT Token"
       type: regex
-      pattern: "eyJ[a-zA-Z0-9_-]+\\.eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+"
+      pattern: 'eyJ[a-zA-Z0-9\-_]+\.eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+'
       label: "[JWT_REDACTED]"
       enabled: false
 
     # Exemplo: Detectar chaves privadas SSH/RSA
     - name: "Chave Privada"
       type: regex
-      pattern: "-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----"
+      pattern: '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
       label: "[PRIVATE_KEY_REDACTED]"
       enabled: false

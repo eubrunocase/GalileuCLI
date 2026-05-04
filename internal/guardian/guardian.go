@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -22,12 +21,6 @@ func generateUUID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
-
-var bodyPool = sync.Pool{
-	New: func() interface{} {
-		return make([]byte, 0, 32*1024)
-	},
 }
 
 type LogRequest struct {
@@ -130,7 +123,7 @@ var (
 	shutdownChan  chan struct{}
 )
 
-func GracefulListenWithCA(certPEM, keyPEM []byte) {
+func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer) {
 	proxy := goproxy.NewProxyHttpServer()
 
 	setCA(certPEM, keyPEM)
@@ -138,13 +131,10 @@ func GracefulListenWithCA(certPEM, keyPEM []byte) {
 	if err := InitAuditLogger(); err != nil {
 		fmt.Printf("[GALILEU] Aviso: Nao foi possivel iniciar auditoria: %v\n", err)
 	}
-	defer CloseAuditLogger()
 
 	logWorkerPool = NewLogWorkerPool(4, 100)
 	logWorkerPool.Start()
 	defer logWorkerPool.Shutdown()
-
-	analyzer := NewAnalyzer()
 
 	targetHosts := []string{
 		"opencode.ai",
@@ -155,82 +145,119 @@ func GracefulListenWithCA(certPEM, keyPEM []byte) {
 		"api.mistral.ai",
 	}
 
-	processRequest := func(r *http.Request) (*http.Request, *http.Response) {
-		if r.Body == nil {
-			return r, nil
-		}
-
-		startTime := time.Now()
-
-		bufRaw := bodyPool.Get().([]byte)
-		buf := bufRaw[:0]
-		defer bodyPool.Put(buf)
-
-		body := bytes.NewBuffer(buf)
-		_, err := io.Copy(body, r.Body)
-		if err != nil {
-			return r, nil
-		}
-		bodyBytes := body.Bytes()
-
-		analysisStart := time.Now()
-		result := analyzer.Analyze(bodyBytes)
-		analysisDurationMs := int(time.Since(analysisStart).Milliseconds())
-
-		host, path, method := r.Host, r.URL.Path, r.Method
-		provider := inferProvider(host)
-
-		payloadInfo := extractPayloadInfo(bodyBytes)
-
-		logWorkerPool.Submit(LogRequest{
-			RequestID: generateUUID(),
-			Host:      host,
-			Provider:  provider,
-			Path:      path,
-			Method:    method,
-			Model:     payloadInfo.model,
-
-			Redacted:           result.Modified,
-			PatternCount:       result.PatternCount,
-			DetectedPatterns:   result.DetectedPatterns,
-			RedactionPositions: result.RedactionPositions,
-
-			MessageCount:    payloadInfo.messageCount,
-			HasSystemPrompt: payloadInfo.hasSystemPrompt,
-			Stream:          payloadInfo.stream,
-
-			RequestBodySizeBytes:  len(bodyBytes),
-			ResponseBodySizeBytes: 0,
-
-			ProxyLatencyMs:     int(time.Since(startTime).Milliseconds()),
-			AnalysisDurationMs: analysisDurationMs,
-		})
-
-		if result.Modified {
-			fmt.Printf("[GALILEU] Interceptado em %s: Dados sensiveis removidos.\n", r.Host)
-			r.Body = io.NopCloser(bytes.NewReader(result.Result))
-			r.ContentLength = int64(len(result.Result))
-			r.Header.Set("Content-Length", fmt.Sprintf("%d", len(result.Result)))
-		} else {
-			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		}
-
-		return r, nil
-	}
-
 	for _, host := range targetHosts {
 		h := host
 		proxy.OnRequest(goproxy.DstHostIs(h)).DoFunc(
 			func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-				fmt.Printf("[DEBUG] Requisicao capturada para: %s\n", r.Host)
-				return processRequest(r)
+				if r.Body == nil || r.Body == http.NoBody || r.Method != "POST" {
+					return r, nil
+				}
+
+				startTime := time.Now()
+
+				bodyBytes, err := io.ReadAll(r.Body)
+				if err != nil {
+					logWorkerPool.Submit(LogRequest{
+						RequestID:      generateUUID(),
+						Host:           r.Host,
+						Provider:       inferProvider(r.Host),
+						Path:           r.URL.Path,
+						Method:         r.Method,
+						ProxyError:     true,
+						ErrorMessage:   fmt.Sprintf("Failed to read body: %v", err),
+						ProxyLatencyMs: int(time.Since(startTime).Milliseconds()),
+					})
+					return r, nil
+				}
+
+				analysisStart := time.Now()
+				result := analyzer.Analyze(bodyBytes)
+				analysisDurationMs := int(time.Since(analysisStart).Milliseconds())
+
+				host := r.Host
+				path := r.URL.Path
+				method := r.Method
+				provider := inferProvider(host)
+
+				payloadInfo := extractPayloadInfo(bodyBytes)
+
+				logWorkerPool.Submit(LogRequest{
+					RequestID: generateUUID(),
+					Host:      host,
+					Provider:  provider,
+					Path:      path,
+					Method:    method,
+					Model:     payloadInfo.model,
+
+					Redacted:           result.Modified,
+					PatternCount:       result.PatternCount,
+					DetectedPatterns:   result.DetectedPatterns,
+					RedactionPositions: result.RedactionPositions,
+
+					MessageCount:    payloadInfo.messageCount,
+					HasSystemPrompt: payloadInfo.hasSystemPrompt,
+					Stream:          payloadInfo.stream,
+
+					RequestBodySizeBytes:  len(bodyBytes),
+					ResponseBodySizeBytes: 0,
+
+					ProxyLatencyMs:     int(time.Since(startTime).Milliseconds()),
+					AnalysisDurationMs: analysisDurationMs,
+				})
+
+				if result.Modified {
+					fmt.Printf("[GALILEU] Interceptado em %s: %d dado(s) sensivel(is) removido(s).\n", r.Host, result.PatternCount)
+					r.Body = io.NopCloser(bytes.NewReader(result.Result))
+					r.ContentLength = int64(len(result.Result))
+					r.Header.Set("Content-Length", fmt.Sprintf("%d", len(result.Result)))
+					if r.Header.Get("Transfer-Encoding") != "" {
+						r.Header.Del("Transfer-Encoding")
+					}
+				} else {
+					// ✅ CORREÇÃO: Restaurar body sem re-ler
+					r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+					r.ContentLength = int64(len(bodyBytes))
+				}
+
+				return r, nil
 			},
 		)
 	}
 
+	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		if resp != nil && resp.StatusCode >= 500 {
+			fmt.Printf("[GALILEU] Erro %d recebido de %s%s\n", resp.StatusCode, ctx.Req.Host, ctx.Req.URL.Path)
+		}
+		return resp
+	})
+
+	// ✅ CORREÇÃO: Adicionar handler para erros de conexão usando ConnectionErrHandler
+	proxy.ConnectionErrHandler = func(conn io.Writer, ctx *goproxy.ProxyCtx, err error) {
+		fmt.Printf("[GALILEU] ❌ ERRO DE CONEXÃO: %v\n[GALILEU] Host: %s | Path: %s | Method: %s\n",
+			err, ctx.Req.Host, ctx.Req.URL.Path, ctx.Req.Method)
+
+		logWorkerPool.Submit(LogRequest{
+			RequestID:    generateUUID(),
+			Host:         ctx.Req.Host,
+			Provider:     inferProvider(ctx.Req.Host),
+			Path:         ctx.Req.URL.Path,
+			Method:       ctx.Req.Method,
+			ProxyError:   true,
+			ErrorMessage: fmt.Sprintf("Connection error: %v", err),
+		})
+
+		errorResponse := fmt.Sprintf(
+			"HTTP/1.1 502 Bad Gateway\r\n"+
+				"Content-Type: text/plain\r\n"+
+				"Content-Length: %d\r\n\r\n"+
+				"Proxy error: %s",
+			len(err.Error()), err.Error(),
+		)
+		io.WriteString(conn, errorResponse)
+	}
+
 	proxy.OnRequest().DoFunc(
 		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-			fmt.Printf("[DEBUG] Requisicao recebida: %s %s\n", r.Method, r.Host)
 			return r, nil
 		},
 	)
@@ -238,136 +265,14 @@ func GracefulListenWithCA(certPEM, keyPEM []byte) {
 	fmt.Println("[GALILEU] Proxy MITM Ativo na porta 9000...")
 	shutdownChan = make(chan struct{})
 
-	srv := &http.Server{Addr: ":9000", Handler: proxy}
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("[GALILEU] Erro no servidor: %v\n", err)
-		}
-	}()
-
-	<-shutdownChan
-}
-
-func GracefulListen() {
-	proxy := goproxy.NewProxyHttpServer()
-
-	caCert, err := os.ReadFile("galileu-ca.pem")
-	if err != nil {
-		fmt.Printf("[GALILEU] Erro ao ler galileu-ca.pem: %v\n", err)
-		return
+	// ✅ CORREÇÃO: Adicionar timeouts ao servidor HTTP
+	srv := &http.Server{
+		Addr:         ":9000",
+		Handler:      proxy,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
-	caKey, err := os.ReadFile("galileu-ca-key.pem")
-	if err != nil {
-		fmt.Printf("[GALILEU] Erro ao ler galileu-ca-key.pem: %v\n", err)
-		return
-	}
-
-	setCA(caCert, caKey)
-
-	if err := InitAuditLogger(); err != nil {
-		fmt.Printf("[GALILEU] Aviso: Nao foi possivel iniciar auditoria: %v\n", err)
-	}
-	defer CloseAuditLogger()
-
-	logWorkerPool = NewLogWorkerPool(4, 100)
-	logWorkerPool.Start()
-	defer logWorkerPool.Shutdown()
-
-	analyzer := NewAnalyzer()
-
-	targetHosts := []string{
-		"opencode.ai",
-		"api.openai.com",
-		"api.anthropic.com",
-		"generativelanguage.googleapis.com",
-		"api.cohere.ai",
-		"api.mistral.ai",
-	}
-
-	processRequest := func(r *http.Request) (*http.Request, *http.Response) {
-		if r.Body == nil {
-			return r, nil
-		}
-
-		startTime := time.Now()
-
-		bufRaw := bodyPool.Get().([]byte)
-		buf := bufRaw[:0]
-		defer bodyPool.Put(buf)
-
-		body := bytes.NewBuffer(buf)
-		_, err := io.Copy(body, r.Body)
-		if err != nil {
-			return r, nil
-		}
-		bodyBytes := body.Bytes()
-
-		analysisStart := time.Now()
-		result := analyzer.Analyze(bodyBytes)
-		analysisDurationMs := int(time.Since(analysisStart).Milliseconds())
-
-		host, path, method := r.Host, r.URL.Path, r.Method
-		provider := inferProvider(host)
-
-		payloadInfo := extractPayloadInfo(bodyBytes)
-
-		logWorkerPool.Submit(LogRequest{
-			RequestID: generateUUID(),
-			Host:      host,
-			Provider:  provider,
-			Path:      path,
-			Method:    method,
-			Model:     payloadInfo.model,
-
-			Redacted:           result.Modified,
-			PatternCount:       result.PatternCount,
-			DetectedPatterns:   result.DetectedPatterns,
-			RedactionPositions: result.RedactionPositions,
-
-			MessageCount:    payloadInfo.messageCount,
-			HasSystemPrompt: payloadInfo.hasSystemPrompt,
-			Stream:          payloadInfo.stream,
-
-			RequestBodySizeBytes:  len(bodyBytes),
-			ResponseBodySizeBytes: 0,
-
-			ProxyLatencyMs:     int(time.Since(startTime).Milliseconds()),
-			AnalysisDurationMs: analysisDurationMs,
-		})
-
-		if result.Modified {
-			fmt.Printf("[GALILEU] Interceptado em %s: Dados sensiveis removidos.\n", r.Host)
-			r.Body = io.NopCloser(bytes.NewReader(result.Result))
-			r.ContentLength = int64(len(result.Result))
-			r.Header.Set("Content-Length", fmt.Sprintf("%d", len(result.Result)))
-		} else {
-			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		}
-
-		return r, nil
-	}
-
-	for _, host := range targetHosts {
-		h := host
-		proxy.OnRequest(goproxy.DstHostIs(h)).DoFunc(
-			func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-				fmt.Printf("[DEBUG] Requisicao capturada para: %s\n", r.Host)
-				return processRequest(r)
-			},
-		)
-	}
-
-	proxy.OnRequest().DoFunc(
-		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-			fmt.Printf("[DEBUG] Requisicao recebida: %s %s\n", r.Method, r.Host)
-			return r, nil
-		},
-	)
-
-	fmt.Println("[GALILEU] Proxy MITM Ativo na porta 9000...")
-	shutdownChan = make(chan struct{})
-
-	srv := &http.Server{Addr: ":9000", Handler: proxy}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Printf("[GALILEU] Erro no servidor: %v\n", err)
@@ -405,128 +310,20 @@ func setCA(caCert, caKey []byte) {
 	ca.Leaf = cert
 
 	goproxy.GoproxyCa = ca
-	goproxy.OkConnect = &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: goproxy.TLSConfigFromCA(&ca)}
-	goproxy.MitmConnect = &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: goproxy.TLSConfigFromCA(&ca)}
-}
 
-func StartGuardian() {
-	proxy := goproxy.NewProxyHttpServer()
+	baseTLSConfigFunc := goproxy.TLSConfigFromCA(&ca)
 
-	caCert, err := os.ReadFile("galileu-ca.pem")
-	if err != nil {
-		fmt.Printf("[GALILEU] Erro ao ler galileu-ca.pem: %v\n", err)
-		return
-	}
-	caKey, err := os.ReadFile("galileu-ca-key.pem")
-	if err != nil {
-		fmt.Printf("[GALILEU] Erro ao ler galileu-ca-key.pem: %v\n", err)
-		return
-	}
-
-	setCA(caCert, caKey)
-
-	if err := InitAuditLogger(); err != nil {
-		fmt.Printf("[GALILEU] Aviso: Nao foi possivel iniciar auditoria: %v\n", err)
-	}
-	defer CloseAuditLogger()
-
-	logWorkerPool = NewLogWorkerPool(4, 100)
-	logWorkerPool.Start()
-	defer logWorkerPool.Shutdown()
-
-	analyzer := NewAnalyzer()
-
-	targetHosts := []string{
-		"opencode.ai",
-		"api.openai.com",
-		"api.anthropic.com",
-		"generativelanguage.googleapis.com",
-		"api.cohere.ai",
-		"api.mistral.ai",
-	}
-
-	processRequest := func(r *http.Request) (*http.Request, *http.Response) {
-		if r.Body == nil {
-			return r, nil
-		}
-
-		startTime := time.Now()
-
-		bufRaw := bodyPool.Get().([]byte)
-		buf := bufRaw[:0]
-		defer bodyPool.Put(buf)
-
-		body := bytes.NewBuffer(buf)
-		_, err := io.Copy(body, r.Body)
+	forceHTTP1TLS := func(host string, ctx *goproxy.ProxyCtx) (*tls.Config, error) {
+		tlsConf, err := baseTLSConfigFunc(host, ctx)
 		if err != nil {
-			return r, nil
+			return nil, err
 		}
-		bodyBytes := body.Bytes()
-
-		analysisStart := time.Now()
-		result := analyzer.Analyze(bodyBytes)
-		analysisDurationMs := int(time.Since(analysisStart).Milliseconds())
-
-		host, path, method := r.Host, r.URL.Path, r.Method
-		provider := inferProvider(host)
-
-		payloadInfo := extractPayloadInfo(bodyBytes)
-
-		logWorkerPool.Submit(LogRequest{
-			RequestID: generateUUID(),
-			Host:      host,
-			Provider:  provider,
-			Path:      path,
-			Method:    method,
-			Model:     payloadInfo.model,
-
-			Redacted:           result.Modified,
-			PatternCount:       result.PatternCount,
-			DetectedPatterns:   result.DetectedPatterns,
-			RedactionPositions: result.RedactionPositions,
-
-			MessageCount:    payloadInfo.messageCount,
-			HasSystemPrompt: payloadInfo.hasSystemPrompt,
-			Stream:          payloadInfo.stream,
-
-			RequestBodySizeBytes:  len(bodyBytes),
-			ResponseBodySizeBytes: 0,
-
-			ProxyLatencyMs:     int(time.Since(startTime).Milliseconds()),
-			AnalysisDurationMs: analysisDurationMs,
-		})
-
-		if result.Modified {
-			fmt.Printf("[GALILEU] Interceptado em %s: Dados sensiveis removidos.\n", r.Host)
-			r.Body = io.NopCloser(bytes.NewReader(result.Result))
-			r.ContentLength = int64(len(result.Result))
-			r.Header.Set("Content-Length", fmt.Sprintf("%d", len(result.Result)))
-		} else {
-			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		}
-
-		return r, nil
+		tlsConf.NextProtos = []string{"http/1.1"}
+		return tlsConf, nil
 	}
 
-	for _, host := range targetHosts {
-		h := host
-		proxy.OnRequest(goproxy.DstHostIs(h)).DoFunc(
-			func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-				fmt.Printf("[DEBUG] Requisicao capturada para: %s\n", r.Host)
-				return processRequest(r)
-			},
-		)
-	}
-
-	proxy.OnRequest().DoFunc(
-		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-			fmt.Printf("[DEBUG] Requisicao recebida: %s %s\n", r.Method, r.Host)
-			return r, nil
-		},
-	)
-
-	fmt.Println("[GALILEU] Proxy MITM Ativo na porta 9000...")
-	http.ListenAndServe(":9000", proxy)
+	goproxy.OkConnect = &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: forceHTTP1TLS}
+	goproxy.MitmConnect = &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: forceHTTP1TLS}
 }
 
 func inferProvider(host string) string {

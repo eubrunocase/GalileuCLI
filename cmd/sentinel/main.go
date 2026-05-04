@@ -32,16 +32,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("[GALILEU] Instalando certificado CA no Keychain...")
-	if err := ca.InstallCert(certPath); err != nil {
-		fmt.Printf("[AVISO] Nao foi possivel instalar o certificado automaticamente: %v\n", err)
-		fmt.Println("[DICA] Execute: sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain " + certPath)
+	if err := guardian.InstallCertificateIfNeeded(certPath); err != nil {
+		fmt.Printf("[AVISO] %v\n", err)
 	}
+
+	patterns, err := guardian.LoadConfig("galileu.yml")
+	if err != nil {
+		fmt.Printf("[ERRO] Falha ao carregar configuração: %v\n", err)
+		os.Exit(1)
+	}
+	analyzer := guardian.NewAnalyzer(patterns)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	go guardian.GracefulListenWithCA(certPEM, keyPEM)
+	go guardian.GracefulListenWithCA(certPEM, keyPEM, analyzer)
 
 	fmt.Println("[GALILEU] Proxy ativo na porta 9000.")
 	fmt.Println("[GALILEU] Pressione Ctrl+C para encerrar e persistir o log de auditoria.")

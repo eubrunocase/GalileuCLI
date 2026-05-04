@@ -1,10 +1,32 @@
+# Certificados — nunca versionar
+*.pem
+*.key
+*.crt
 pk.p12
-ca.pem
-key.pem
-galileu-ca.pem
-galileu-ca-key.pem
-galileu_audit.log
+
+# Configuração local (pode conter termos confidenciais)
+galileu.yml
+
+# Binários compilados
 galileu
 galileu.exe
-galileu.yml
 galileu-intel
+
+# Logs de auditoria
+galileu_audit.log
+
+# Ficheiro .env de teste
+.env.fake
+.env.fake.ymlTest
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+galileu_audit.log
+
+# Certificados CA
+galileu-ca-key.pem
+galileu-ca.pem

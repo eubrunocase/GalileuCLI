@@ -1,6 +1,7 @@
 package guardian
 
 import (
+	"encoding/json"
 	"strings"
 )
 
@@ -44,6 +45,21 @@ func ShouldAnalyze(host, method, path string) bool {
 	}
 
 	return true
+}
+
+// ✅ CORREÇÃO: Adicionar função para verificar se requisição é streaming
+// Esta função é chamada internamente em guardian.go para respeitar streaming requests
+func isStreamingRequest(body []byte) bool {
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return false
+	}
+
+	if stream, ok := data["stream"].(bool); ok && stream {
+		return true
+	}
+
+	return false
 }
 
 func isLLMProvider(host string) bool {

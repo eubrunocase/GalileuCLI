@@ -1,3 +1,0 @@
-GOOS=darwin GOARCH=arm64 go build -o galileu ./cmd/sentinel/main.go
-
-go build -o galileu ./cmd/sentinel/main.go
