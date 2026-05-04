@@ -5,6 +5,22 @@
 
 ---
 
+## Demonstração
+
+### Funcionamento em Tempo Real
+
+![OpenCode com Galileu](media/opencode-galileu.gif)
+
+*O GIF acima mostra o OpenCode tentando ler dados sensíveis de ficheiros `.env` — o Galileu intercepta e sanitiza automaticamente as informações antes de chegarem à LLM.*
+
+### Terminal em Execução
+
+![Terminal Galileu](media/terminal-galileu.png)
+
+*Print do terminal durante a execução do Galileu, mostrando o proxy ativo e os registos de auditoria.*
+
+---
+
 ## Arquitectura do Sistema
 
 ```
@@ -104,7 +120,7 @@ scripts\start.bat
 | Requisito | Detalhe |
 |---|---|
 | **Sistema Operativo** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
-| **Go** | Versão 1.23 ou superior (necessário apenas para compilação) |
+| **Go** | Versão 1.25.0 ou superior (necessário apenas para compilação) |
 | **Privilégios** | macOS: `sudo` na primeira execução; Windows: Administrador |
 
 ---
@@ -160,11 +176,10 @@ O **Analyzer** detecta e sanitiza automaticamente os seguintes padrões:
 | Anthropic API Key | `sk-ant-...` | `sk-ant-abc123...` |
 | Google API Key | `AIzaSy...` | `AIzaSyABC123...` |
 | GitHub Token | `ghp_...` | `ghp_abcdef123456...` |
-| Slack / Discord | `xox[baprs]-...` | `xoxb-123456...` |
+| Slack Token | `xox[baprs]-...` | `xoxb-123456...` |
+| Discord Token | `xox[baprs]-...` | `xoxb-123456...` |
 | AWS Access Key | `AKIA...` | `AKIAIOSFODNN7...` |
 | AWS Secret Key | `wJalr...` | `wJalrXUtnFEM...` |
-| Bearer Token | `bearer ...` | `bearer abcdef123456...` |
-| Generic API Key | `api_key...` | `api_keyABC123...` |
 
 Todos os dados sensíveis detectados são substituídos por `[REDACTED_BY_GALILEU]`.
 
@@ -172,9 +187,67 @@ Todos os dados sensíveis detectados são substituídos por `[REDACTED_BY_GALILE
 
 ## Registos de Auditoria Expandidos
 
-O ficheiro `galileu_audit.log` contém um registo JSON detalhado de cada requisição interceptada.
+O ficheiro `galileu_audit.log` contém um registo JSON detalhado de cada requisição interceptada, incluindo:
+
+- **Identificação**: Timestamp, Request ID, Session ID, Machine ID
+- **Requisição**: Host, Provider, Path, Method, Modelo de LLM
+- **Detecção**: Padrões detectados, contagem, posições de redacção
+- **Payload**: Contagem de mensagens, presença de system prompt, streaming
+- **Performance**: Latência do proxy, duração da análise
+- **Resposta**: Status code, tamanhos de request/response
 
 (Consulte a documentação no repositório para o schema completo dos campos de auditoria.)
+
+---
+
+## Configuração (galileu.yml)
+
+O Galileu suporta configuração via ficheiro `galileu.yml` para personalizar os padrões de detecção sem recompilar o código.
+
+### Padrões Built-in
+
+Todos os padrões embutidos podem ser activados ou desactivados individualmente:
+
+```yaml
+analyzer:
+  built_in:
+    openai_key:         true
+    openai_project_key: true
+    anthropic_key:      true
+    google_key:         true
+    github_token:       true
+    slack_token:        true
+    discord_token:      true
+    aws_key:            true
+```
+
+### Padrões Customizados
+
+Adicione os seus próprios padrões de dois tipos:
+
+**Regex** — para padrões complexos:
+```yaml
+custom_patterns:
+  - name: "JWT Token"
+    type: regex
+    pattern: 'eyJ[a-zA-Z0-9\-_]+\.eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+'
+    label: "[JWT_REDACTED]"
+    enabled: true
+```
+
+**Literal** — para strings exactas:
+```yaml
+custom_patterns:
+  - name: "Projectos Confidenciais"
+    type: literal
+    values:
+      - "Operação Phoenix"
+      - "Projecto Stargate"
+    label: "[CONFIDENTIAL_PROJECT_REDACTED]"
+    enabled: true
+```
+
+> **Nota:** Se o ficheiro `galileu.yml` não existir, o Galileu usa todos os padrões built-in activados por omissão.
 
 ---
 
