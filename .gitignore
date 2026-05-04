@@ -27,3 +27,6 @@ galileu_audit.log
 # Certificados CA
 galileu-ca-key.pem
 galileu-ca.pem
+
+
+galileu.yml

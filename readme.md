@@ -275,5 +275,8 @@ Certifique-se de que instalou o certificado conforme as instruções na secção
 
 ## Licença
 
-Este projeto é para fins educacionais e de segurança interna.
-Todos os direitos são reservados ao programador **Bruno Dantas de Oliveira Casé** — [github.com/eubrunocase/GalileuCLI](https://github.com/eubrunocase/GalileuCLI)
+Este projeto está licenciado sob a **Apache License, Version 2.0**.
+
+Copyright © 2026 **Bruno Dantas de Oliveira Casé**
+
+Ver ficheiro [LICENSE](LICENSE) para mais detalhes.
