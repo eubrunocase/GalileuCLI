@@ -32,13 +32,9 @@
 
 O Galileu agora gera e instala o certificado CA **automaticamente** na primeira execução. Não é mais necessário criar ou importar certificados manualmente.
 
-### Opção 1 — Script de Setup Automático
+### Opção 1 — Setup Automático
 
-```bash
-./scripts/setup-galileu.sh
-```
-
-Este script irá:
+Execute o Galileu diretamente. Ele irá:
 1. Verificar se o Go está instalado
 2. Compilar o Galileu para sua arquitetura
 3. Gerar o certificado CA automaticamente
@@ -90,8 +86,8 @@ Galileu/
 ├── galileu                  # Executável principal (macOS)
 ├── galileu-ca.pem           # Certificado CA gerado automaticamente
 ├── galileu-ca-key.pem       # Chave privada do CA (⚠️ NÃO submeter para o repositório)
-├── scripts/
-│   └── setup-galileu.sh     # Script de setup inicial automatizado
+├── galileu.yml              # Configuração do analyzer (não versionado)
+├── galileu.yml.example      # Exemplo de configuração (versionado)
 ├── start-opencode.sh        # Script shell para iniciar o OpenCode com proxy
 └── galileu_audit.log        # Registo de auditoria (gerado automaticamente)
 ```
@@ -144,7 +140,7 @@ export NODE_TLS_REJECT_UNAUTHORIZED=0
 opencode
 ```
  
-> **Nota:** Se o comando `opencode` não funcionar nativamente, substitua-o por `open -a "Visual Studio Code"` no seu script.
+> **Nota:** Certifique-se de que o OpenCode está instalado e acessível no PATH.
  
 ### Passo 3 — Utilizar o OpenCode normalmente
  
@@ -346,14 +342,16 @@ Verifique no Keychain Access se o certificado **Galileu Local CA** está present
 ## Arquitectura do Código
  
 ```
-cmd/sentinel/main.go      # Ponto de entrada, auto-generação e instalação do CA
+cmd/sentinel/main.go      # Ponto de entrada, carregamento de config, auto-geração e instalação do CA
 internal/
   ├── ca/
   │   ├── ca.go           # Geração programática do certificado CA (RSA 4096)
   │   └── install_darwin.go # Instalação automática no Keychain do macOS
   └── guardian/
       ├── guardian.go     # Proxy MITM, LogWorkerPool, extractPayloadInfo, inferProvider
-      ├── analyzer.go     # Detecção tipada (AnalysisResult), PatternInfo, sanitização
+      ├── analyzer.go     # Detecção tipada (AnalysisResult), CompiledPattern, sanitização
+      ├── config.go       # Carregamento do galileu.yml, CompiledPattern, padrões built-in
+      ├── filter.go       # Filtro de hosts e paths para análise
       └── audit.go        # AuditEntry expandido, session_id, machine_id, LogAudit
 ```
  

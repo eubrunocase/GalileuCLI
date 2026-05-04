@@ -1,0 +1,75 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# galileu.yml — Configuração do Analyzer de Dados Sensíveis
+#
+# Este ficheiro controla o comportamento do Galileu.
+# Não é necessário tocar no código Go para alterar os padrões de detecção.
+#
+# TIPOS DE PADRÃO CUSTOM:
+#   type: regex   → O campo 'pattern' aceita uma expressão regular
+#   type: literal → O campo 'values' aceita uma lista de strings exactas
+# ═══════════════════════════════════════════════════════════════════════════════
+
+analyzer:
+
+  # ─── Padrões embutidos ───────────────────────────────────────────────────────
+  # Activar (true) ou desactivar (false) cada padrão built-in individualmente.
+  built_in:
+    openai_key:         true
+    openai_project_key: true
+    anthropic_key:      true
+    google_key:         true
+    github_token:       true
+    slack_token:        true
+    discord_token:      true
+    aws_key:            true
+
+  # ─── Padrões personalizados ──────────────────────────────────────────────────
+  # Adicionar quantos padrões forem necessários.
+  # Cada padrão tem um nome descritivo, um tipo, e um label de substituição.
+  custom_patterns:
+
+    # Exemplo: Detectar passwords de base de dados em variáveis de ambiente
+    - name: "Password de Base de Dados"
+      type: regex
+      pattern: "DB_PASSWORD\\s*[=:]\\s*[\"']?([^\\s\"'<>]+)"
+      label: "[DB_PASSWORD_REDACTED]"
+      enabled: false   # Mudar para true para activar
+
+    # Exemplo: Detectar connection strings completas (Postgres, MySQL, MongoDB)
+    - name: "Connection String de Base de Dados"
+      type: regex
+      pattern: "(postgres|postgresql|mysql|mongodb|redis)://[^\\s\"'<>]+"
+      label: "[CONNECTION_STRING_REDACTED]"
+      enabled: false
+
+    # Exemplo: Detectar nomes de tabelas internas da empresa
+    - name: "Tabelas Internas"
+      type: literal
+      values:
+        - "substituir_pelo_nome_real_da_tabela"
+        - "outra_tabela_confidencial"
+      label: "[INTERNAL_TABLE_REDACTED]"
+      enabled: false
+
+    # Exemplo: Detectar nomes de projectos ou operações confidenciais
+    - name: "Projectos Confidenciais"
+      type: literal
+      values:
+        - "Projecto Exemplo"
+        - "Operação Exemplo"
+      label: "[CONFIDENTIAL_PROJECT_REDACTED]"
+      enabled: false
+
+    # Exemplo: Detectar tokens JWT
+    - name: "JWT Token"
+      type: regex
+      pattern: "eyJ[a-zA-Z0-9_-]+\\.eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+"
+      label: "[JWT_REDACTED]"
+      enabled: false
+
+    # Exemplo: Detectar chaves privadas SSH/RSA
+    - name: "Chave Privada"
+      type: regex
+      pattern: "-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----"
+      label: "[PRIVATE_KEY_REDACTED]"
+      enabled: false

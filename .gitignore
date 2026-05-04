@@ -6,4 +6,5 @@ galileu-ca-key.pem
 galileu_audit.log
 galileu
 galileu.exe
-
+galileu.yml
+galileu-intel
