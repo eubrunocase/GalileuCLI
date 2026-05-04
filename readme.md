@@ -1,7 +1,7 @@
 # Galileu — Proxy de Segurança e Governança para LLMs
 > Suporta: macOS (Apple Silicon & Intel) · Windows · Linux
 
-**Galileu** é uma ferramenta de segurança e governança de dados voltada para o monitoramento e sanitização de informações enviadas a provedores de Inteligência Artificial (LLMs). O projeto adota uma arquitetura de **Proxy Reverso MITM (Man-in-the-Middle)**, actuando como camada inteligente entre a sua ferramenta de desenvolvimento e os servidores das LLMs.
+**Galileu** é uma ferramenta de segurança e governança de dados voltada para o monitoramento e sanitização de informações enviadas a provedores de Inteligência Artificial (LLMs). O projeto adota uma arquitetura de **Proxy Reverso MITM (Man-in-the-Middle)**, atuando como camada inteligente entre a sua ferramenta de desenvolvimento e os servidores das LLMs.
 
 ---
 
@@ -21,7 +21,7 @@
 
 ---
 
-## Arquitectura do Sistema
+## Arquitetura do Sistema
 
 ```
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
@@ -119,7 +119,7 @@ scripts\start.bat
 
 | Requisito | Detalhe |
 |---|---|
-| **Sistema Operativo** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
+| **Sistema Operacional** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
 | **Go** | Versão 1.25.0 ou superior (necessário apenas para compilação) |
 | **Privilégios** | macOS: `sudo` na primeira execução; Windows: Administrador |
 
@@ -206,7 +206,7 @@ O Galileu suporta configuração via ficheiro `galileu.yml` para personalizar os
 
 ### Padrões Built-in
 
-Todos os padrões embutidos podem ser activados ou desactivados individualmente:
+Todos os padrões embutidos podem ser ativados ou desativados individualmente:
 
 ```yaml
 analyzer:
@@ -235,7 +235,7 @@ custom_patterns:
     enabled: true
 ```
 
-**Literal** — para strings exactas:
+**Literal** — para strings exatas:
 ```yaml
 custom_patterns:
   - name: "Projectos Confidenciais"
@@ -267,13 +267,13 @@ Certifique-se de que instalou o certificado conforme as instruções na secção
 ## Segurança
 
 - A chave privada (`galileu-ca-key.pem`) é gerada localmente e **nunca** sai da sua máquina.
-- **Nunca** efectue commit dos ficheiros `.pem` para o repositório — confirme que o `.gitignore` está actualizado.
+- **Nunca** efetue commit dos ficheiros `.pem` para o repositório — confirme que o `.gitignore` está atualizado.
 - O certificado CA é válido por **10 anos** e utiliza chave **RSA 4096-bit**.
-- O proxy actua exclusivamente sobre as ferramentas que configurarem explicitamente a porta **9000**.
+- O proxy atua exclusivamente sobre as ferramentas que configurarem explicitamente a porta **9000**.
 
 ---
 
 ## Licença
 
-Este projecto é para fins educacionais e de segurança interna.
-Todos os direitos são reservados ao programador **Bruno Dantas de Oliveira Cazé** — [github.com/eubrunocase/Galileu](https://github.com/eubrunocase/Galileu)
+Este projeto é para fins educacionais e de segurança interna.
+Todos os direitos são reservados ao programador **Bruno Dantas de Oliveira Casé** — [github.com/eubrunocase/GalileuCLI](https://github.com/eubrunocase/GalileuCLI)
