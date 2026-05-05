@@ -1,6 +1,7 @@
 package guardian
 
 import (
+	"regexp"
 	"testing"
 )
 
@@ -155,5 +156,211 @@ func TestAnalyzerNoFalsePositives(t *testing.T) {
 		t.Errorf("Taxa de falso positivo: %d/%d (%.2f%%)", falsePositives, len(benign), float64(falsePositives)*100/float64(len(benign)))
 	} else {
 		t.Logf("Taxa de falso positivo: 0/%d (0.00%%)", len(benign))
+	}
+}
+
+func TestAnalyzerCustomPatternsRegex(t *testing.T) {
+	cases := []struct {
+		name      string
+		pattern   string
+		label     string
+		testCases []struct {
+			payload    string
+			shouldFind bool
+		}
+	}{
+		{
+			name:    "DB_PASSWORD regex",
+			pattern: `DB_PASSWORD\s*=\s*[\x27]?[^\s\x27]+`,
+			label:   "[DB_PASSWORD_REDACTED]",
+			testCases: []struct {
+				payload    string
+				shouldFind bool
+			}{
+				{`DB_PASSWORD=secret123`, true},
+				{`DB_PASSWORD='mysecret'`, true},
+				{`export DB_PASSWORD="pass"`, true},
+				{`password=123456`, false},
+				{`{"key": "value"}`, false},
+			},
+		},
+		{
+			name:    "Connection String regex",
+			pattern: `(postgres|postgresql|mysql|mongodb|redis)://[^\s]+`,
+			label:   "[CONNECTION_STRING_REDACTED]",
+			testCases: []struct {
+				payload    string
+				shouldFind bool
+			}{
+				{`postgres://user:pass@localhost:5432/db`, true},
+				{`mysql://root:password@localhost:3306/mydb`, true},
+				{`mongodb://mongo.example.com:27017`, true},
+				{`redis://cache.local:6379`, true},
+				{`oracle://db:1521`, false},
+			},
+		},
+		{
+			name:    "JWT regex",
+			pattern: `eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+`,
+			label:   "[JWT_REDACTED]",
+			testCases: []struct {
+				payload    string
+				shouldFind bool
+			}{
+				{`Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature`, true},
+			},
+		},
+		{
+			name:    "Private Key regex",
+			pattern: `-----BEGIN.*PRIVATE KEY-----`,
+			label:   "[PRIVATE_KEY_REDACTED]",
+			testCases: []struct {
+				payload    string
+				shouldFind bool
+			}{
+				{`-----BEGIN RSA PRIVATE KEY-----`, true},
+				{`-----BEGIN EC PRIVATE KEY-----`, true},
+				{`-----BEGIN OPENSSH PRIVATE KEY-----`, true},
+				{`-----END PRIVATE KEY-----`, false},
+				{`PUBLIC KEY`, false},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			re := regexp.MustCompile(tc.pattern)
+			analyzer := NewAnalyzer([]CompiledPattern{
+				{Name: tc.name, Regex: re, Label: tc.label},
+			})
+
+			passed := 0
+			for _, tt := range tc.testCases {
+				result := analyzer.Analyze([]byte(tt.payload))
+				found := result.Modified
+				if found != tt.shouldFind {
+					t.Errorf("payload %q: esperava %v, got %v", tt.payload, tt.shouldFind, found)
+				} else {
+					passed++
+				}
+			}
+			t.Logf("%s: %d/%d casos OK", tc.name, passed, len(tc.testCases))
+		})
+	}
+}
+
+func TestAnalyzerCustomPatternsLiteral(t *testing.T) {
+	cases := []struct {
+		name      string
+		values    []string
+		label     string
+		testCases []struct {
+			payload    string
+			shouldFind bool
+		}
+	}{
+		{
+			name:   "Tabelas Internas",
+			values: []string{"clientes_vip", "transacoes_internas", "dados_financeiros_2024"},
+			label:  "[INTERNAL_TABLE_REDACTED]",
+			testCases: []struct {
+				payload    string
+				shouldFind bool
+			}{
+				{`SELECT * FROM clientes_vip`, true},
+				{`tabela: transacoes_internas`, true},
+				{`report: dados_financeiros_2024`, true},
+				{`clientes_comuns`, false},
+				{`other_table`, false},
+			},
+		},
+		{
+			name:   "Projectos Confidenciais",
+			values: []string{"Operação Phoenix", "Projecto Stargate", "Iniciativa Alpha"},
+			label:  "[CONFIDENTIAL_PROJECT_REDACTED]",
+			testCases: []struct {
+				payload    string
+				shouldFind bool
+			}{
+				{`Projeto: Operação Phoenix`, true},
+				{`Projecto Stargate em andamento`, true},
+				{`Iniciativa Alpha iniciada`, true},
+				{`Operação другое`, false},
+				{`Projeto Normal`, false},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var patterns []CompiledPattern
+			for _, v := range tc.values {
+				patterns = append(patterns, CompiledPattern{
+					Name:  tc.name + "_" + v,
+					Regex: regexp.MustCompile(regexp.QuoteMeta(v)),
+					Label: tc.label,
+				})
+			}
+			analyzer := NewAnalyzer(patterns)
+
+			passed := 0
+			for _, tt := range tc.testCases {
+				result := analyzer.Analyze([]byte(tt.payload))
+				found := result.Modified
+				if found != tt.shouldFind {
+					t.Errorf("payload %q: esperava %v, got %v", tt.payload, tt.shouldFind, found)
+				} else {
+					passed++
+				}
+			}
+			t.Logf("%s: %d/%d casos OK", tc.name, passed, len(tc.testCases))
+		})
+	}
+}
+
+func TestAnalyzerCustomPatternsNoFalsePositives(t *testing.T) {
+	benign := []struct {
+		name    string
+		pattern string
+		payload string
+	}{
+		// DB_PASSWORD - não deve detectar strings normais
+		{"DB_PASSWORD", `DB_PASSWORD\s*=\s*[\x27]?[^\s\x27]+`, `{"field": "value"}`},
+		{"DB_PASSWORD", `DB_PASSWORD\s*=\s*[\x27]?[^\s\x27]+`, `password=123456`},
+
+		// Connection Strings - formatos inválidos
+		{"CONN_STRING", `(postgres|postgresql|mysql|mongodb|redis)://[^\s]+`, `http://api.example.com`},
+		{"CONN_STRING", `(postgres|postgresql|mysql|mongodb|redis)://[^\s]+`, `ftp://files.server.com`},
+
+		// JWT - não deve detectar strings similares
+		{"JWT", `eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+`, `{"token": "not.a.jwt"}`},
+		{"JWT", `eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+`, `eyJinvalid.signature`},
+
+		// Private Key - só deve detectar BEGIN
+		{"PRIVATE_KEY", `-----BEGIN.*PRIVATE KEY-----`, `-----BEGIN CERTIFICATE-----`},
+		{"PRIVATE_KEY", `-----BEGIN.*PRIVATE KEY-----`, `BEGIN PRIVATE KEY`},
+
+		// Literais - valores diferentes
+		{"TABELAS", `clientes_vip|transacoes_internas`, `clientes_normais`},
+		{"PROJETOS", `Operação Phoenix|Projecto Stargate`, `Operação Normal`},
+	}
+
+	falsePositives := 0
+	for _, tc := range benign {
+		re := regexp.MustCompile(tc.pattern)
+		analyzer := NewAnalyzer([]CompiledPattern{
+			{Name: tc.name, Regex: re, Label: "[REDACTED]"},
+		})
+		result := analyzer.Analyze([]byte(tc.payload))
+		if result.Modified {
+			t.Logf("FALSO POSITIVO: %s em %q", tc.name, tc.payload)
+			falsePositives++
+		}
+	}
+
+	if falsePositives > 0 {
+		t.Errorf("Taxa de falso positivo (custom): %d/%d (%.2f%%)", falsePositives, len(benign), float64(falsePositives)*100/float64(len(benign)))
+	} else {
+		t.Logf("Taxa de falso positivo (custom): 0/%d (0.00%%)", len(benign))
 	}
 }

@@ -481,16 +481,54 @@ Certifique-se de que instalou o certificado conforme as instruções na secção
 
 Pode verificar personalmente a confiabilidade e performance do analyzer executando os testes:
 
+### Testes Built-in (Padrões do Código)
+
 ```bash
 # Todos os testes do analyzer
 go test -v -run "TestAnalyzer" ./internal/guardian/...
 
-# Apenas true positives
+# True positives (built-in)
 go test -v -run "TestAnalyzerTruePositives" ./internal/guardian/...
 
-# Apenas false positives
+# False positives (built-in)
 go test -v -run "TestAnalyzerNoFalsePositives" ./internal/guardian/...
+```
 
+### Testes de Padrões Customizados (galileu.yml)
+
+Estes testes validam os padrões configuráveis via `galileu.yml`:
+
+```bash
+# Padrões customizados tipo regex
+go test -v -run "TestAnalyzerCustomPatternsRegex" ./internal/guardian/...
+
+# Padrões customizados tipo literal
+go test -v -run "TestAnalyzerCustomPatternsLiteral" ./internal/guardian/...
+
+# False positives (customizados)
+go test -v -run "TestAnalyzerCustomPatternsNoFalsePositives" ./internal/guardian/...
+```
+
+#### Resultados dos Testes Customizados
+
+![Custom Patterns Literal](media/CustomPatternsLiteralTest.png)
+
+![Custom Patterns False Positives](media/CustomPatternsNoFalsePositivesTest.png)
+
+**Regex Customizado:**
+- DB_PASSWORD: 5/5 ✓
+- Connection String: 5/5 ✓
+- JWT: 1/1 ✓
+- Private Key: 5/5 ✓
+- False Positives: 0/10 (0.00%) ✓
+
+**Literal Customizado:**
+- Tabelas Internas: 5/5 ✓
+- Projetos Confidenciais: 5/5 ✓
+
+### Benchmarks e Performance
+
+```bash
 # Benchmarks
 go test -bench=. -benchmem ./internal/guardian/...
 
@@ -498,7 +536,7 @@ go test -bench=. -benchmem ./internal/guardian/...
 go test -v -run "TestAnalyzerLatency|TestAnalyzerThroughput" ./internal/guardian/...
 ```
 
-Ou consulte o ficheiro [markdown/tests.md](markdown/tests.md) para referência.
+Ou consulte o ficheiro [markdown/tests.md](markdown/tests.md) para referência completa.
 
 ---
 
