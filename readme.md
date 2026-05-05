@@ -75,25 +75,78 @@ make build-all
 
 ## Configuração do Certificado CA
 
-O Galileu utiliza certificados no formato padronizado: `galileu-ca.pem` e `galileu-ca-key.pem`.
+> **⚠️ PONTO CRÍTICO DE SEGURANÇA**
+>
+> O Galileu gera um Certificado de Autoridade (CA) **localmente na sua máquina**. Este certificado é exclusivo para o seu ambiente e **nunca deve sair do seu computador**.
 
-### macOS
+### Como Funciona
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SUA MÁQUINA LOCAL                        │
+│                                                             │
+│  ┌──────────┐    ┌──────────────────┐    ┌──────────┐    │
+│  │ Cliente  │───▶│  Galileu Proxy  │───▶│   LLM    │    │
+│  │ (OpenCode)│◀───│  (localhost:9000)│◀───│ Provider │    │
+│  └──────────┘    └──────────────────┘    └──────────┘    │
+│                        │                                    │
+│                        ▼                                    │
+│              ┌──────────────────┐                          │
+│              │   Certificado CA  │                          │
+│              │  (Local apenas)   │                          │
+│              │                   │                          │
+│              │ galileu-ca.pem    │  ⚠️ NUNCA               │
+│              │ galileu-ca-key.pem│  ⚠️ COMPARTILHAR       │
+│              └──────────────────┘                          │
+│                        │                                    │
+│                        ▼                                    │
+│              ┌──────────────────┐                          │
+│              │  Keychain / Cert │                          │
+│              │  Store do SO     │                          │
+│              └──────────────────┘                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### O que acontece tecnicamente
+
+1. O Galileu gera um par de chaves RSA 4096-bit **localmente** (`galileu-ca.pem` + `galileu-ca-key.pem`)
+2. O certificado é instalado **apenas no seu sistema operacional** (Keychain no macOS, Cert Store no Windows, `/usr/local/share/ca-certificates/` no Linux)
+3. Quando o proxy intercepta uma requisição HTTPS, ele apresenta um certificado assinado por esta CA
+4. O seu SO confia no certificado porque a CA está instalada localmente
+5. A chave privada (`galileu-ca-key.pem`) **nunca sai da sua máquina**
+
+### Instalação por Sistema Operativo
+
+#### macOS
 O Galileu tentará instalar o certificado automaticamente no Keychain do sistema (será solicitada a senha de administrador na primeira execução). Caso prefira instalar manualmente:
 
 ```bash
 sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain galileu-ca.pem
 ```
 
-### Windows
+#### Windows
 O Galileu instala automaticamente o certificado CA no repositório de certificados do sistema ao arrancar como **Administrador**. Basta executar `galileu.exe` com privilégios administrativos.
 
-### Linux
+#### Linux
 No Linux, a instalação é manual. Após compilar, execute:
 
 ```bash
 sudo cp galileu-ca.pem /usr/local/share/ca-certificates/galileu.crt
 sudo update-ca-certificates
 ```
+
+### ⚠️ Proteção dos Ficheiros `.pem`
+
+O seu `.gitignore` **já está configurado** para impedir o commit acidental:
+
+```gitignore
+# Certificados — nunca versionar
+*.pem
+galileu-ca-key.pem
+galileu-ca.pem
+```
+
+**NUNCA** remova estas linhas do `.gitignore`. A chave privada (`galileu-ca-key.pem`) é o que permite ao Galileu fazer o MITM — se ela for exposta, um atacante pode criar certificados falsificados em seu nome.
 
 ---
 
