@@ -238,26 +238,99 @@ Todos os dados sensíveis detectados são substituídos por `[REDACTED_BY_GALILE
 
 ### Performance do Analyzer
 
-O algoritmo de análise foi benchmarkado em hardware real:
+O algoritmo de análise foi benchmarkado em hardware real com múltiplas metodologias:
+
+![Performance Test](media/performanceTest.png)
+
+#### Benchmark Puro (Go testing.B)
 
 ```
 CPU: 13th Gen Intel(R) Core(TM) i5-13400
 OS:  Linux (amd64)
 
-BenchmarkAnalyze-16    	  467726	  2590 ns/op	  13568 B/op	  1 allocs/op
+BenchmarkAnalyze-16    	  405961	  2540 ns/op	  13568 B/op	  1 allocs/op
 ```
 
-**Resultados:**
-- **Velocidade**: ~2.59 microsegundos por análise
-- **Memória**: 13.5 KB por operação
-- **Alocações**: apenas 1 alocação por execução
-- **Throughput**: ~387,000 análises por segundo
+#### Teste de Latência (1000 iterações × 7 payloads)
 
-O analyzer é extremamente eficiente, processando centenas de milhares de requisições por segundo com consumo mínimo de memória.
+```
+=== Latência em Nanosegundos ===
+Total de operações: 7000
+Média: 1072.12 ns (1.07 µs)
+Min: 542 ns
+Max: 60242 ns
+P50: 706 ns (0.71 µs)
+P95: 2329 ns (2.33 µs)
+P99: 5446 ns (5.45 µs)
+Throughput estimado: ~932,729 ops/s
+```
 
-### Comprovação de resultados
+#### Teste de Throughput (100 iterações × 7 payloads)
 
-![Resultados Benchmark Galileu](media/benchmark.png)
+```
+=== Throughput ===
+Total de requisições processadas: 700
+Tempo total: 0.66 ms
+Média por requisição: 0.94 µs
+Throughput: 1,063,458 req/s
+```
+
+**Resultados Consolidados:**
+| Métrica | Valor |
+|--------|-------|
+| Latência média | ~1.07 µs |
+| Latência P95 | ~2.33 µs |
+| Latência P99 | ~5.45 µs |
+| Throughput | **>1 milhão req/s** |
+| Memória | 13.5 KB/op |
+| Alocações | 1 por operação |
+
+O analyzer-processa **mais de 1 milhão de requisições por segundo** com latência inferior a 3µs no P95.
+
+### Confiabilidade do Detector
+
+O detector foi exaustivamente testado para garantir **0% de falsos positivos**:
+
+![Todos os Testes](media/AllTests.png)
+
+#### Testes de True Positives (Detecção de API Keys)
+
+![True Positives](media/truePositives.png)
+
+Todos os 17 padrões suportados foram detectados corretamente:
+- ✓ openai_key (2 casos)
+- ✓ openai_project_key (2 casos)
+- ✓ anthropic_key (2 casos)
+- ✓ google_key (2 casos)
+- ✓ github_token (2 casos)
+- ✓ slack_token (6 casos)
+- ✓ aws_access_key (1 caso)
+
+#### ⚠️ Testes de Falsos Positivos (CRÍTICO)
+
+Este é o teste **mais crítico** para garantir que requisições legítimas não sejam bloqueadas ou modificadas incorretamente:
+
+![False Positives](media/falsePositivesTest.png)
+
+**Resultado: 0/32 (0.00%)** - ZERO falsos positivos!
+
+Casos testados que NÃO foram detectados:
+- ✓ UUIDs (v4): não detectado
+- ✓ MD5/SHA hashes: não detectado
+- ✓ Base64 strings: não detectado
+- ✓ Payloads normais (GPT, Claude, Gemini): não detectado
+- ✓ Nomes de métodos Go: não detectado
+- ✓ URLs e caminhos: não detectado
+- ✓ Tokens de outros serviços: não detectado
+
+Esta taxa de **0% de falsos positivos** é o diferencial que garante confiança no uso em produção.
+
+**Resultados dos Testes:**
+- **True Positives**: 17/17 detectados ✓
+- **False Positives**: 0/32 (0.00%) ✓
+- **Precisão**: 100%
+
+Esta taxa de 0% de falsos positivos é crucial para garantir que requisições legítimas não sejam bloqueadas ou modificadas incorretamente.
 
 ---
 
@@ -401,6 +474,31 @@ Execute o `galileu.exe` como Administrador (clique direito → "Executar como ad
 
 ### Linux: Erro de certificado SSL/TLS
 Certifique-se de que instalou o certificado conforme as instruções na secção "Configuração do Certificado CA".
+
+---
+
+## Testes
+
+Pode verificar personalmente a confiabilidade e performance do analyzer executando os testes:
+
+```bash
+# Todos os testes do analyzer
+go test -v -run "TestAnalyzer" ./internal/guardian/...
+
+# Apenas true positives
+go test -v -run "TestAnalyzerTruePositives" ./internal/guardian/...
+
+# Apenas false positives
+go test -v -run "TestAnalyzerNoFalsePositives" ./internal/guardian/...
+
+# Benchmarks
+go test -bench=. -benchmem ./internal/guardian/...
+
+# Testes de performance
+go test -v -run "TestAnalyzerLatency|TestAnalyzerThroughput" ./internal/guardian/...
+```
+
+Ou consulte o ficheiro [markdown/tests.md](markdown/tests.md) para referência.
 
 ---
 
