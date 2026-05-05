@@ -44,7 +44,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+          go build -ldflags="-s -w" \
             -o ${{ matrix.artifact }} \
             ./cmd/sentinel
 
@@ -70,7 +70,6 @@ jobs:
         run: |
           cd dist
           sha256sum * > checksums.txt
-          cat checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -79,33 +78,27 @@ jobs:
           body: |
             ## Galileu ${{ github.ref_name }}
 
-            Proxy de segurança e governança para LLMs — protege dados sensíveis
-            antes que cheguem aos provedores de IA.
+            Proxy reverso MITM de segurança e governança para LLMs.
+            Intercepta e sanitiza dados sensíveis antes que cheguem aos provedores de IA.
 
-            ### Download
+            ### Plataformas
 
             | Plataforma | Arquivo |
             |---|---|
-            | macOS Apple Silicon (M1/M2/M3) | `galileu-darwin-arm64` |
-            | macOS Intel | `galileu-darwin-amd64` |
-            | Linux | `galileu-linux-amd64` |
-            | Windows | `galileu-windows-amd64.exe` |
+            | macOS Apple Silicon | galileu-darwin-arm64 |
+            | macOS Intel | galileu-darwin-amd64 |
+            | Linux x86_64 | galileu-linux-amd64 |
+            | Windows x86_64 | galileu-windows-amd64.exe |
 
-            ### Instalação rápida
+            ### Inicio rapido
 
-            **macOS / Linux**
-```bash
-            chmod +x galileu-*
-            ./galileu-darwin-arm64   # ou o binário da sua plataforma
-```
+            macOS e Linux: chmod +x galileu-* e execute o binario da sua plataforma.
+            Windows: execute galileu-windows-amd64.exe como Administrador.
+            Configure sua ferramenta de IA para usar o proxy na porta 9000.
 
-            **Windows**
-            Execute `galileu-windows-amd64.exe` como Administrador.
+            ### Licenca
 
-            ### Verificar integridade
-```bash
-            sha256sum -c checksums.txt
-```
+            Apache 2.0 - Bruno Dantas de Oliveira Case
           files: |
             dist/*
           draft: false
