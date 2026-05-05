@@ -291,11 +291,11 @@ O analyzer-processa **mais de 1 milhão de requisições por segundo** com latê
 
 O detector foi exaustivamente testado para garantir **0% de falsos positivos**:
 
-![Todos os Testes](media/AllTests.png)
+![Todos os Testes](media/allTests.png)
 
 #### Testes de True Positives (Detecção de API Keys)
 
-![True Positives](media/truePositives.png)
+![True Positives](media/truePositivesTest.png)
 
 Todos os 17 padrões suportados foram detectados corretamente:
 - ✓ openai_key (2 casos)
