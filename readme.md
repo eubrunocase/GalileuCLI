@@ -85,25 +85,25 @@ make build-all
 ┌─────────────────────────────────────────────────────────────┐
 │                    SUA MÁQUINA LOCAL                        │
 │                                                             │
-│  ┌──────────┐    ┌──────────────────┐    ┌──────────┐    │
-│  │ Cliente  │───▶│  Galileu Proxy  │───▶│   LLM    │    │
-│  │ (OpenCode)│◀───│  (localhost:9000)│◀───│ Provider │    │
-│  └──────────┘    └──────────────────┘    └──────────┘    │
+│  ┌──────────┐    ┌──────────────────┐    ┌──────────┐       │   
+│  │ Cliente  │───▶│  Galileu Proxy  │───▶│   LLM    │       │
+│  │ (OpenCode)│◀───│  (localhost:9000)│◀───│ Provider│      │
+│  └──────────┘    └──────────────────┘    └──────────┘       │
 │                        │                                    │
 │                        ▼                                    │
-│              ┌──────────────────┐                          │
+│              ┌──────────────────┐                           │
 │              │   Certificado CA  │                          │
 │              │  (Local apenas)   │                          │
 │              │                   │                          │
-│              │ galileu-ca.pem    │  ⚠️ NUNCA               │
-│              │ galileu-ca-key.pem│  ⚠️ COMPARTILHAR       │
-│              └──────────────────┘                          │
+│              │ galileu-ca.pem    │  ⚠️ NUNCA                │ 
+│              │ galileu-ca-key.pem│  ⚠️ COMPARTILHAR         │
+│              └──────────────────┘                           │
 │                        │                                    │
 │                        ▼                                    │
-│              ┌──────────────────┐                          │
-│              │  Keychain / Cert │                          │
-│              │  Store do SO     │                          │
-│              └──────────────────┘                          │
+│              ┌──────────────────┐                           │
+│              │  Keychain / Cert │                           │
+│              │  Store do SO     │                           │
+│              └──────────────────┘                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -257,6 +257,38 @@ O ficheiro `galileu_audit.log` contém um registo JSON detalhado de cada requisi
 
 O Galileu suporta configuração via ficheiro `galileu.yml` para personalizar os padrões de detecção sem recompilar o código.
 
+### Estrutura do Ficheiro
+
+O ficheiro `galileu.yml` deve seguir exatamente esta estrutura:
+
+```yaml
+analyzer:
+
+  # ─── Padrões embutidos ─────────────────────────────────────────────────
+  built_in:
+    openai_key:         true
+    openai_project_key: true
+    anthropic_key:      true
+    google_key:         true
+    github_token:       true
+    slack_token:        true
+    discord_token:      true
+    aws_key:            true
+
+  # ─── Padrões personalizados ──────────────────────────────────────────────
+  # Para ativar, mude enabled: false para enabled: true
+  custom_patterns:
+    # ...
+```
+
+### Campos Obrigatórios
+
+| Campo | Tipo | Descrição |
+|-------|------|------------|
+| `analyzer` | object | Raiz da configuração |
+| `built_in` | object | Contém os padrões embutidos |
+| `custom_patterns` | array | Lista de padrões personalizados |
+
 ### Padrões Built-in
 
 Todos os padrões embutidos podem ser ativados ou desativados individualmente:
@@ -278,12 +310,12 @@ analyzer:
 
 Adicione os seus próprios padrões de dois tipos:
 
-**Regex** — para padrões complexos:
+**Regex** — para padrões complexos (use aspas normais `'...'`):
 ```yaml
 custom_patterns:
   - name: "JWT Token"
     type: regex
-    pattern: 'eyJ[a-zA-Z0-9\-_]+\.eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+'
+    pattern: 'eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'
     label: "[JWT_REDACTED]"
     enabled: true
 ```
@@ -300,7 +332,39 @@ custom_patterns:
     enabled: true
 ```
 
-> **Nota:** Se o ficheiro `galileu.yml` não existir, o Galileu usa todos os padrões built-in activados por omissão.
+### Exemplos Completos
+
+**Exemplo com padrão Regex:**
+```yaml
+- name: "Password de Base de Dados"
+  type: regex
+  pattern: 'DB_PASSWORD\s*=\s*[\x27]?[^\s\x27]+'
+  label: "[DB_PASSWORD_REDACTED]"
+  enabled: true
+```
+
+**Exemplo com padrão Literal:**
+```yaml
+- name: "Tabelas Internas"
+  type: literal
+  values:
+    - "clientes_vip"
+    - "transacoes_internas"
+    - "dados_financeiros_2024"
+  label: "[INTERNAL_TABLE_REDACTED]"
+  enabled: true
+```
+
+### Notas Importantes
+
+1. **Formato YAML**: Use espaços (não tabs) para indentação
+2. **Aspas em Regex**: Use aspas normais `'...'` para definir patterns regex
+3. **Escape**: Caracteres especiais como `\x27` são usados para evitar conflitos com aspas
+4. **Enabled**: Defina `enabled: true` para ativar, `enabled: false` para desativar
+5. **Label**: O texto de substituição deve ser único e descritivo
+
+> **Nota:** Se o ficheiro `galileu.yml` não existir, o Galileu usa todos os padrões builtin activados por omissão.
+> Para um guia completo, consulte o ficheiro `galileu.yml.example` no repositório.
 
 ---
 
