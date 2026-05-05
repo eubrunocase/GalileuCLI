@@ -236,6 +236,29 @@ O **Analyzer** detecta e sanitiza automaticamente os seguintes padrões:
 
 Todos os dados sensíveis detectados são substituídos por `[REDACTED_BY_GALILEU]`.
 
+### Performance do Analyzer
+
+O algoritmo de análise foi benchmarkado em hardware real:
+
+```
+CPU: 13th Gen Intel(R) Core(TM) i5-13400
+OS:  Linux (amd64)
+
+BenchmarkAnalyze-16    	  467726	  2590 ns/op	  13568 B/op	  1 allocs/op
+```
+
+**Resultados:**
+- **Velocidade**: ~2.59 microsegundos por análise
+- **Memória**: 13.5 KB por operação
+- **Alocações**: apenas 1 alocação por execução
+- **Throughput**: ~387,000 análises por segundo
+
+O analyzer é extremamente eficiente, processando centenas de milhares de requisições por segundo com consumo mínimo de memória.
+
+### Comprovação de resultados
+
+![Resultados Benchmark Galileu](media/benchmark.png)
+
 ---
 
 ## Registos de Auditoria Expandidos
