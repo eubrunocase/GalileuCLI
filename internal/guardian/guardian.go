@@ -141,6 +141,7 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer) {
 		"api.openai.com",
 		"api.anthropic.com",
 		"generativelanguage.googleapis.com",
+		"aistudio.googleapis.com",
 		"api.cohere.ai",
 		"api.mistral.ai",
 	}
@@ -384,6 +385,23 @@ func extractPayloadInfo(body []byte) payloadInfo {
 	if !info.hasSystemPrompt {
 		if _, ok := data["system"]; ok {
 			info.hasSystemPrompt = true
+		}
+	}
+
+	if contents, ok := data["contents"].([]interface{}); ok {
+		info.messageCount += len(contents)
+		for _, c := range contents {
+			if content, ok := c.(map[string]interface{}); ok {
+				if role, ok := content["role"].(string); ok && role == "system" {
+					info.hasSystemPrompt = true
+				}
+			}
+		}
+	}
+
+	if genConfig, ok := data["generationConfig"].(map[string]interface{}); ok {
+		if _, ok := genConfig["stopSequences"]; ok {
+			// Gemini-specific config detected
 		}
 	}
 

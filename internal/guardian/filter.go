@@ -19,6 +19,9 @@ var skipHosts = map[string]bool{
 var llmSuffixes = []string{
 	"/completions",
 	"/chat/completions",
+	"/generateContent",
+	"/streamGenerateContent",
+	"/generateMessage",
 }
 
 func ShouldAnalyze(host, method, path string) bool {
@@ -67,6 +70,7 @@ func isLLMProvider(host string) bool {
 	return strings.Contains(h, "openai.com") ||
 		strings.Contains(h, "anthropic.com") ||
 		strings.Contains(h, "generativelanguage") ||
+		strings.Contains(h, "aistudio") ||
 		strings.Contains(h, "cohere.ai") ||
 		strings.Contains(h, "mistral.ai") ||
 		strings.Contains(h, "opencode.ai")
