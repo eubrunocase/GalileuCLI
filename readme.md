@@ -549,6 +549,18 @@ Ou consulte o ficheiro [markdown/tests.md](markdown/tests.md) para referência c
 
 ---
 
+## Roadmap — Futuro do Galileu
+
+Ordem de lançamento prevista para as próximas funcionalidades:
+
+| Ordem | Feature | Descrição |
+|-------|---------|-----------|
+| 1 | **Integração com Gemini CLI + Claude Code** | Suporte nativo para interceptação e governança de tráfego do Gemini CLI e Claude Code |
+| 2 | **Integração com GitHub Copilot (VSCode)** | Suporte nativa para interceptação e sanitização de requisições do GitHub Copilot dentro do Visual Studio Code |
+| 3 | **TUI (Terminal User Interface)** | Interface interativa no terminal para configuração, monitorização em tempo real e gestão de auditoria |
+
+---
+
 ## Licença
 
 Este projeto está licenciado sob a **Apache License, Version 2.0**.
