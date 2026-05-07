@@ -34,7 +34,7 @@ func main() {
 		fmt.Printf("[AVISO] %v\n", err)
 	}
 
-	patterns, err := guardian.LoadConfig("galileu.yml")
+	port, patterns, err := guardian.LoadConfig("galileu.yml")
 	if err != nil {
 		fmt.Printf("[ERRO] Falha ao carregar configuração: %v\n", err)
 		os.Exit(1)
@@ -44,9 +44,9 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	go guardian.GracefulListenWithCA(certPEM, keyPEM, analyzer)
+	go guardian.GracefulListenWithCA(certPEM, keyPEM, analyzer, port)
 
-	fmt.Println("[GALILEU] Proxy ativo na porta 9000.")
+	fmt.Println("[GALILEU] Proxy ativo na porta" + fmt.Sprintf(":%d", port) + ". Aguardando requisições...")
 	fmt.Println("[GALILEU] Pressione Ctrl+C para encerrar e persistir o log de auditoria.")
 
 	<-quit

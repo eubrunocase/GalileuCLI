@@ -23,25 +23,9 @@
 
 ## Arquitetura do Sistema
 
-```
-┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│   Cliente   │───▶  │  Galileu    │───▶  │   LLM       │
-│  (OpenCode) │◀───  │  Proxy MITM │◀───  │  Provider   │
-└─────────────┘      └─────────────┘      └─────────────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │  Analyzer   │
-                    │ (Sanitização)│
-                    └─────────────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │   Audit     │
-                    │    Log      │
-                    └─────────────┘
-```
+![Arquitetura do Sistema](media/SystemArchitecture.png)
 
+*Diagrama da arquitetura do sistema
 ---
 
 ## Compilação
@@ -358,6 +342,7 @@ O Galileu suporta configuração via ficheiro `galileu.yml` para personalizar os
 O ficheiro `galileu.yml` deve seguir exatamente esta estrutura:
 
 ```yaml
+port: 9000
 analyzer:
 
   # ─── Padrões embutidos ─────────────────────────────────────────────────
@@ -381,9 +366,20 @@ analyzer:
 
 | Campo | Tipo | Descrição |
 |-------|------|------------|
+| `port`     | object | Raiz da configuração |
 | `analyzer` | object | Raiz da configuração |
 | `built_in` | object | Contém os padrões embutidos |
 | `custom_patterns` | array | Lista de padrões personalizados |
+
+
+### Porta de execução
+```yaml
+ port: 9000
+```
+Você pode escolher a porta de execução da aplicação. Que por default é 9000.
+
+> **Nota:** Lembre-se de mudar o apontamento da sua ferramenta para a porta definida.
+
 
 ### Padrões Built-in
 

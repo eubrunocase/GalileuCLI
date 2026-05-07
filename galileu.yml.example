@@ -9,6 +9,7 @@
 #   type: literal → O campo 'values' aceita uma lista de strings exactas
 # ═════════════════════════════════════════════════════════════════════════════
 
+port: 9000 → você pode escolher a porta em que a aplicação irá executar, mas lembre-se de abrir a sua ferramenta apontando para o endereço correto do proxy
 analyzer:
 
   # ─── Padrões embutidos ─────────────────────────────────────────────────

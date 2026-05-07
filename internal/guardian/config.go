@@ -10,18 +10,16 @@ import (
 
 // ─── Estruturas que mapeiam o galileu.yml ────────────────────────────────────
 
-// GalileuConfig é a raiz do ficheiro YAML.
 type GalileuConfig struct {
+	Port     int            `yaml:"port"`
 	Analyzer AnalyzerConfig `yaml:"analyzer"`
 }
 
-// AnalyzerConfig contém os built-ins e os padrões customizados.
 type AnalyzerConfig struct {
 	BuiltIn        BuiltInConfig   `yaml:"built_in"`
 	CustomPatterns []CustomPattern `yaml:"custom_patterns"`
 }
 
-// BuiltInConfig permite activar/desactivar cada padrão embutido individualmente.
 type BuiltInConfig struct {
 	OpenAIKey     bool `yaml:"openai_key"`
 	OpenAIProject bool `yaml:"openai_project_key"`
@@ -33,10 +31,6 @@ type BuiltInConfig struct {
 	AWSKey        bool `yaml:"aws_key"`
 }
 
-// CustomPattern representa um padrão definido pelo utilizador.
-// O campo Type aceita dois valores:
-//   - "regex"   → o campo Pattern contém uma expressão regular
-//   - "literal" → o campo Values contém strings de texto fixo
 type CustomPattern struct {
 	Name    string   `yaml:"name"`
 	Type    string   `yaml:"type"`
@@ -46,19 +40,12 @@ type CustomPattern struct {
 	Enabled bool     `yaml:"enabled"`
 }
 
-// ─── Estrutura interna compilada ─────────────────────────────────────────────
-
-// CompiledPattern é a representação em memória de um padrão já compilado.
-// É esta estrutura que o analyzer.go usa em runtime.
 type CompiledPattern struct {
 	Name  string
 	Regex *regexp.Regexp
 	Label string
 }
 
-// ─── Padrões built-in (os que existiam hardcoded no analyzer.go) ─────────────
-
-// builtInDefinitions define os padrões embutidos do Galileu.
 var builtInDefinitions = []struct {
 	enabledFn func(BuiltInConfig) bool
 	pattern   string
@@ -123,25 +110,20 @@ var builtInDefinitions = []struct {
 
 // ─── Função principal de carregamento ────────────────────────────────────────
 
-// LoadConfig lê o ficheiro YAML no caminho indicado e devolve uma lista de
-// CompiledPattern prontos a usar pelo analyzer.
-//
-// Se o ficheiro não existir, devolve os padrões built-in todos activados
-// (comportamento legacy idêntico ao da versão anterior hardcoded).
-func LoadConfig(path string) ([]CompiledPattern, error) {
+func LoadConfig(path string) (int, []CompiledPattern, error) {
 	var cfg GalileuConfig
 
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Printf("[Galileu] galileu.yml não encontrado em '%s'. A usar padrões built-in por omissão.\n", path)
-			return compileBuiltIns(defaultBuiltInConfig()), nil
+			return 9000, compileBuiltIns(defaultBuiltInConfig()), nil
 		}
-		return nil, fmt.Errorf("erro ao ler galileu.yml: %w", err)
+		return 0, nil, fmt.Errorf("erro ao ler galileu.yml: %w", err)
 	}
 
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("erro ao fazer parse do galileu.yml: %w", err)
+		return 0, nil, fmt.Errorf("erro ao fazer parse do galileu.yml: %w", err)
 	}
 
 	var compiled []CompiledPattern
@@ -184,8 +166,13 @@ func LoadConfig(path string) ([]CompiledPattern, error) {
 		}
 	}
 
+	port := cfg.Port
+	if port == 0 {
+		port = 9000
+	}
+
 	fmt.Printf("[Galileu] %d padrão(ões) de detecção carregado(s) a partir de '%s'.\n", len(compiled), path)
-	return compiled, nil
+	return port, compiled, nil
 }
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────

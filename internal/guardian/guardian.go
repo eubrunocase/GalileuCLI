@@ -123,7 +123,7 @@ var (
 	shutdownChan  chan struct{}
 )
 
-func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer) {
+func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) {
 	proxy := goproxy.NewProxyHttpServer()
 
 	setCA(certPEM, keyPEM)
@@ -263,12 +263,12 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer) {
 		},
 	)
 
-	fmt.Println("[GALILEU] Proxy MITM Ativo na porta 9000...")
+	fmt.Println("[GALILEU] Proxy MITM Ativo na porta " + fmt.Sprintf(":%d", port) + "...")
 	shutdownChan = make(chan struct{})
 
 	// ✅ CORREÇÃO: Adicionar timeouts ao servidor HTTP
 	srv := &http.Server{
-		Addr:         ":9000",
+		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      proxy,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
