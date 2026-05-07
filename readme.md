@@ -16,7 +16,9 @@ Ferramentas de AI coding como OpenCode, Cursor e GitHub Copilot leem arquivos do
 
 ### Funcionamento em Tempo Real
 
-![OpenCode com Galileu](media/use-galileu.gif)
+<p align="center">
+  <img src="media/use-galileu.gif" alt="OpenCode com Galileu" width="80%">
+</p>
 
 *O GIF acima mostra o OpenCode tentando ler dados sensíveis de ficheiros `.env` — o Galileu intercepta e sanitiza automaticamente as informações antes de chegarem à LLM.*
 
