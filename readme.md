@@ -388,7 +388,7 @@ O ficheiro `galileu_audit.log` é criado automaticamente ao finalizar a primeira
 - **Performance**: Latência do proxy, duração da análise
 - **Resposta**: Status code, tamanhos de request/response
 
-Consulte o ficheiro [markdown/tests.md](markdown/tests.md) para o schema completo dos campos de auditoria.
+Consulte o ficheiro [markdown/SCHEMA_AUDITORIA.md](markdown/SCHEMA_AUDITORIA.md) para o schema completo dos campos de auditoria.
 
 ---
 
@@ -526,6 +526,7 @@ go test -v -run "TestAnalyzerCustomPatternsNoFalsePositives" ./internal/guardian
 go test -bench=. -benchmem ./internal/guardian/...
 go test -v -run "TestAnalyzerLatency|TestAnalyzerThroughput" ./internal/guardian/...
 ```
+Consulte o ficheiro [markdown/tests.md](markdown/tests.md) para mais informações sobre a execução dos testes
 
 ---
 
