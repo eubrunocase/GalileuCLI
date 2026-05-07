@@ -1,9 +1,4 @@
 # Galileu — Proxy de Segurança e Governança para LLMs
-
-![License](https://img.shields.io/github/license/eubrunocase/GalileuCLI?style=flat-square)
-![Latest Release](https://img.shields.io/github/v/release/eubrunocase/GalileuCLI?style=flat-square)
-![CI Status](https://img.shields.io/github/actions/workflow/status/eubrunocase/GalileuCLI/release.yml?style=flat-square)
-
 > Suporta: macOS (Apple Silicon & Intel) · Windows · Linux
 
 **Galileu** é uma ferramenta de segurança e governança de dados voltada para o monitoramento e sanitização de informações enviadas a provedores de Inteligência Artificial (LLMs). O projeto adota uma arquitetura de **Proxy Reverso MITM (Man-in-the-Middle)**, atuando como camada inteligente entre a sua ferramenta de desenvolvimento e os servidores das LLMs.
@@ -22,7 +17,7 @@
 
 ![Terminal Galileu](media/terminal-galileu.png)
 
-*Print do terminal durante a execução do Galileu, mostrando o proxy ativo e os registos de auditoria.*
+*Print do terminal durante a execução do Galileu, mostrando o proxy ativo e os registros de auditoria.*
 
 ---
 
@@ -46,43 +41,6 @@
                     │    Log      │
                     └─────────────┘
 ```
-
----
-
-## Instalação Rápida
-
-Baixe o binário pré-compilado para a sua plataforma em
-[Releases](https://github.com/eubrunocase/GalileuCLI/releases/latest):
-
-| Plataforma | Arquivo |
-|---|---|
-| macOS Apple Silicon (M1/M2/M3) | `galileu-darwin-arm64` |
-| macOS Intel | `galileu-darwin-amd64` |
-| Linux x86_64 | `galileu-linux-amd64` |
-| Windows x86_64 | `galileu-windows-amd64.exe` |
-
-**macOS / Linux:**
-```bash
-chmod +x galileu-darwin-arm64
-./galileu-darwin-arm64
-```
-
-> Não precisa de Go instalado. A compilação é necessária apenas para desenvolvimento.
-
-### Configuração Opcional
-
-O binário funciona de forma autônoma. O arquivo `galileu.yml` é opcional — se não existir, todos os padrões built-in são ativados automaticamente.
-
-O Galileu procura o `galileu.yml` no diretório onde o binário é executado (diretório de trabalho atual), não dentro do próprio binário.
-
-Exemplo de estrutura de diretórios após download:
-```
-pasta-do-usuario/
-├── galileu-darwin-arm64   ← binário baixado
-└── galileu.yml            ← arquivo opcional (criado pelo usuário)
-```
-
-Para personalizar, crie um `galileu.yml` na mesma pasta do binário usando o `galileu.yml.example` como referência.
 
 ---
 
@@ -157,7 +115,7 @@ make build-all
 4. O seu SO confia no certificado porque a CA está instalada localmente
 5. A chave privada (`galileu-ca-key.pem`) **nunca sai da sua máquina**
 
-### Instalação por Sistema Operacional
+### Instalação por Sistema Operativo
 
 #### macOS
 O Galileu tentará instalar o certificado automaticamente no Keychain do sistema (será solicitada a senha de administrador na primeira execução). Caso prefira instalar manualmente:
@@ -212,19 +170,10 @@ scripts\start.bat
 
 ## Pré-requisitos
 
-### Para Utilizar (Binário)
 | Requisito | Detalhe |
 |---|---|
 | **Sistema Operacional** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
-| **Privilégios** | macOS: `sudo` na primeira execução; Windows: Administrador |
-
-> Não é necessário ter Go instalado.
-
-### Para Desenvolver ou Compilar
-| Requisito | Detalhe |
-|---|---|
-| **Sistema Operacional** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
-| **Go** | Versão 1.25.0 ou superior |
+| **Go** | Versão 1.25.0 ou superior (necessário apenas para compilação) |
 | **Privilégios** | macOS: `sudo` na primeira execução; Windows: Administrador |
 
 ---
@@ -336,9 +285,7 @@ Throughput: 1,063,458 req/s
 | Memória | 13.5 KB/op |
 | Alocações | 1 por operação |
 
-> **Nota Metodológica:** O benchmark primário é o teste `testing.B` do Go (405.961 iterações), o padrão mais rigoroso da linguagem. Os valores de throughput estimado são baseados em amostras menores (700 operações no teste de throughput) e servem apenas como referência.
-
-O analyzer processa **mais de 1 milhão de requisições por segundo** com latência inferior a 3 µs no P95.
+O analyzer-processa **mais de 1 milhão de requisições por segundo** com latência inferior a 3µs no P95.
 
 ### Confiabilidade do Detector
 
@@ -387,9 +334,9 @@ Esta taxa de 0% de falsos positivos é crucial para garantir que requisições l
 
 ---
 
-## Registos de Auditoria Expandidos
+## Registros de Auditoria Expandidos
 
-O ficheiro `galileu_audit.log` contém um registo JSON detalhado de cada requisição interceptada, incluindo:
+O ficheiro `galileu_audit.log` será criado ao finalizar a primeira execução, e contém um registo JSON detalhado de cada requisição interceptada, incluindo:
 
 - **Identificação**: Timestamp, Request ID, Session ID, Machine ID
 - **Requisição**: Host, Provider, Path, Method, Modelo de LLM
@@ -404,12 +351,7 @@ O ficheiro `galileu_audit.log` contém um registo JSON detalhado de cada requisi
 
 ## Configuração (galileu.yml)
 
-O ficheiro `galileu.yml` é **opcional** e deve ser colocado no diretório onde o binário é executado (diretório de trabalho atual). O Galileu procura o ficheiro neste local, não dentro do próprio binário.
-
-- **Se o ficheiro não existir**: todos os padrões built-in são ativados automaticamente.
-- **Se o ficheiro existir**: os padrões built-in e customizados são configurados conforme especificado.
-
-Para personalizar, crie um `galileu.yml` na pasta do binário usando o `galileu.yml.example` como referência.
+O Galileu suporta configuração via ficheiro `galileu.yml` para personalizar os padrões de detecção sem recompilar o código.
 
 ### Estrutura do Ficheiro
 
@@ -604,20 +546,6 @@ Ou consulte o ficheiro [markdown/tests.md](markdown/tests.md) para referência c
 - **Nunca** efetue commit dos ficheiros `.pem` para o repositório — confirme que o `.gitignore` está atualizado.
 - O certificado CA é válido por **10 anos** e utiliza chave **RSA 4096-bit**.
 - O proxy atua exclusivamente sobre as ferramentas que configurarem explicitamente a porta **9000**.
-
-> **Nota:** Os ficheiros `SECURITY.md` (com instruções para reporte de vulnerabilidades) e `CONTRIBUTING.md` estão em desenvolvimento e serão adicionados em breve.
-
----
-
-## Roadmap — Futuro do Galileu
-
-Ordem de lançamento prevista para as próximas funcionalidades:
-
-| Ordem | Feature | Descrição |
-|-------|---------|-----------|
-| 1 | **Integração com Gemini CLI + Claude Code** | Suporte nativo para interceptação e governança de tráfego do Gemini CLI e Claude Code |
-| 2 | **Integração com GitHub Copilot (VSCode)** | Suporte nativa para interceptação e sanitização de requisições do GitHub Copilot dentro do Visual Studio Code |
-| 3 | **TUI (Terminal User Interface)** | Interface interativa no terminal para configuração, monitorização em tempo real e gestão de auditoria |
 
 ---
 
