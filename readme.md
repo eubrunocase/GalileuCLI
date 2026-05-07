@@ -2,7 +2,7 @@
 
 ![License](https://img.shields.io/github/license/eubrunocase/GalileuCLI?style=flat-square)
 ![Latest Release](https://img.shields.io/github/v/release/eubrunocase/GalileuCLI?style=flat-square)
-![CI Status](https://img.shields.io/github/actions/workflow/status/eubrunocase/GalileuCLI/ci.yml?style=flat-square)
+![CI Status](https://img.shields.io/github/actions/workflow/status/eubrunocase/GalileuCLI/release.yml?style=flat-square)
 
 > Suporta: macOS (Apple Silicon & Intel) · Windows · Linux
 
