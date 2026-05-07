@@ -12,7 +12,7 @@ galileu-intel
 # Logs de auditoria
 galileu_audit.log
 
-
+.env.fakeYmlTest
 
 # macOS
 .DS_Store

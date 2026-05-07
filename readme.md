@@ -1,7 +1,14 @@
 # Galileu — Proxy de Segurança e Governança para LLMs
+
+![License](https://img.shields.io/github/license/eubrunocase/GalileuCLI?style=flat-square)
+![Latest Release](https://img.shields.io/github/v/release/eubrunocase/GalileuCLI?style=flat-square)
+![CI Status](https://img.shields.io/github/actions/workflow/status/eubrunocase/GalileuCLI/release.yml?style=flat-square)
+
 > Suporta: macOS (Apple Silicon & Intel) · Windows · Linux
 
 **Galileu** é uma ferramenta de segurança e governança de dados voltada para o monitoramento e sanitização de informações enviadas a provedores de Inteligência Artificial (LLMs). O projeto adota uma arquitetura de **Proxy Reverso MITM (Man-in-the-Middle)**, atuando como camada inteligente entre a sua ferramenta de desenvolvimento e os servidores das LLMs.
+
+Ferramentas de AI coding como OpenCode, Cursor e GitHub Copilot leem arquivos do projeto inteiro — incluindo `.env`, configs e credenciais — e enviam tudo como contexto para a LLM. O Galileu intercepta essas requisições e redige automaticamente qualquer dado sensível antes que ele saia da sua máquina.
 
 ---
 
@@ -25,7 +32,48 @@
 
 ![Arquitetura do Sistema](media/SystemArchitecture.png)
 
-*Diagrama da arquitetura e funcioanmento do sistema 
+*Diagrama da arquitetura e funcionamento do sistema.*
+
+---
+
+## Instalação Rápida
+
+Baixe o binário pré-compilado para a sua plataforma em
+[Releases](https://github.com/eubrunocase/GalileuCLI/releases/latest):
+
+| Plataforma | Arquivo |
+|---|---|
+| macOS Apple Silicon (M1/M2/M3) | `galileu-darwin-arm64` |
+| macOS Intel | `galileu-darwin-amd64` |
+| Linux x86_64 | `galileu-linux-amd64` |
+| Windows x86_64 | `galileu-windows-amd64.exe` |
+
+**macOS / Linux:**
+```bash
+chmod +x galileu-darwin-arm64
+./galileu-darwin-arm64
+```
+
+**Windows:**
+
+Execute `galileu-windows-amd64.exe` como Administrador (clique direito → "Executar como administrador").
+
+> Não é necessário ter Go instalado. A compilação é necessária apenas para desenvolvimento.
+
+### Configuração Opcional
+
+O binário funciona de forma autônoma. O arquivo `galileu.yml` é **opcional** — se não existir, todos os padrões built-in são ativados automaticamente.
+
+O Galileu procura o `galileu.yml` no diretório onde o binário é executado, não dentro do próprio binário.
+
+```
+pasta-do-usuario/
+├── galileu-darwin-arm64   ← binário baixado
+└── galileu.yml            ← arquivo opcional (criado pelo usuário)
+```
+
+Para personalizar, crie um `galileu.yml` na mesma pasta do binário usando o `galileu.yml.example` como referência.
+
 ---
 
 ## Compilação
@@ -69,9 +117,9 @@ make build-all
 ┌─────────────────────────────────────────────────────────────┐
 │                    SUA MÁQUINA LOCAL                        │
 │                                                             │
-│  ┌──────────┐    ┌──────────────────┐    ┌──────────┐       │   
+│  ┌──────────┐    ┌──────────────────┐    ┌──────────┐       │
 │  │ Cliente  │───▶│  Galileu Proxy  │───▶│   LLM    │       │
-│  │ (OpenCode)│◀───│  (localhost:9000)│◀───│ Provider│      │
+│  │ (OpenCode)│◀───│  (localhost:9000)│◀───│ Provider│       │
 │  └──────────┘    └──────────────────┘    └──────────┘       │
 │                        │                                    │
 │                        ▼                                    │
@@ -79,7 +127,7 @@ make build-all
 │              │   Certificado CA  │                          │
 │              │  (Local apenas)   │                          │
 │              │                   │                          │
-│              │ galileu-ca.pem    │  ⚠️ NUNCA                │ 
+│              │ galileu-ca.pem    │  ⚠️ NUNCA                │
 │              │ galileu-ca-key.pem│  ⚠️ COMPARTILHAR         │
 │              └──────────────────┘                           │
 │                        │                                    │
@@ -99,17 +147,18 @@ make build-all
 4. O seu SO confia no certificado porque a CA está instalada localmente
 5. A chave privada (`galileu-ca-key.pem`) **nunca sai da sua máquina**
 
-### Instalação por Sistema Operativo
+### Instalação por Sistema Operacional
 
 #### macOS
 O Galileu tentará instalar o certificado automaticamente no Keychain do sistema (será solicitada a senha de administrador na primeira execução). Caso prefira instalar manualmente:
 
 ```bash
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain galileu-ca.pem
+sudo security add-trusted-cert -d -r trustRoot \
+  -k /Library/Keychains/System.keychain galileu-ca.pem
 ```
 
 #### Windows
-O Galileu instala automaticamente o certificado CA no repositório de certificados do sistema ao arrancar como **Administrador**. Basta executar `galileu.exe` com privilégios administrativos.
+O Galileu instala automaticamente o certificado CA no repositório de certificados do sistema ao executar como **Administrador**. Basta executar `galileu.exe` com privilégios administrativos.
 
 #### Linux
 No Linux, a instalação é manual. Após compilar, execute:
@@ -138,13 +187,13 @@ galileu-ca.pem
 
 ### macOS / Linux
 ```bash
-./galileu
+./galileu-darwin-arm64   # ou o binário da sua plataforma
 ./scripts/start.sh
 ```
 
 ### Windows
 ```bash
-galileu.exe
+galileu-windows-amd64.exe
 scripts\start.bat
 ```
 
@@ -154,10 +203,21 @@ scripts\start.bat
 
 ## Pré-requisitos
 
+### Para Utilizar (Binário)
+
 | Requisito | Detalhe |
 |---|---|
 | **Sistema Operacional** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
-| **Go** | Versão 1.25 ou superior (necessário apenas para compilação) |
+| **Privilégios** | macOS: `sudo` na primeira execução; Windows: Administrador |
+
+> Não é necessário ter Go instalado.
+
+### Para Desenvolver ou Compilar
+
+| Requisito | Detalhe |
+|---|---|
+| **Sistema Operacional** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
+| **Go** | Versão 1.25 ou superior |
 | **Privilégios** | macOS: `sudo` na primeira execução; Windows: Administrador |
 
 ---
@@ -181,8 +241,8 @@ Galileu/
 │       └── main.go          # Ponto de entrada
 ├── internal/
 │   ├── ca/                  # Geração e gestão do certificado CA
-│   └── guardian/           # Proxy MITM, Analyzer, Audit, instalação de certificado por plataforma
-└── galileu_audit.log        # Registo de auditoria (gerado automaticamente)
+│   └── guardian/            # Proxy MITM, Analyzer, Audit, instalação de certificado por plataforma
+└── galileu_audit.log        # Registo de auditoria (gerado automaticamente na primeira execução)
 ```
 
 ---
@@ -232,7 +292,7 @@ O algoritmo de análise foi benchmarkado em hardware real com múltiplas metodol
 CPU: 13th Gen Intel(R) Core(TM) i5-13400
 OS:  Linux (amd64)
 
-BenchmarkAnalyze-16    	  405961	  2540 ns/op	  13568 B/op	  1 allocs/op
+BenchmarkAnalyze-16      405961      2540 ns/op      13568 B/op      1 allocs/op
 ```
 
 #### Teste de Latência (1000 iterações × 7 payloads)
@@ -243,7 +303,7 @@ Total de operações: 7000
 Média: 1072.12 ns (1.07 µs)
 Min: 542 ns
 Max: 60242 ns
-P50: 706 ns (0.71 µs)
+P50: 706 ns  (0.71 µs)
 P95: 2329 ns (2.33 µs)
 P99: 5446 ns (5.45 µs)
 Throughput estimado: ~932,729 ops/s
@@ -260,8 +320,9 @@ Throughput: 1,063,458 req/s
 ```
 
 **Resultados Consolidados:**
+
 | Métrica | Valor |
-|--------|-------|
+|---|---|
 | Latência média | ~1.07 µs |
 | Latência P95 | ~2.33 µs |
 | Latência P99 | ~5.45 µs |
@@ -269,7 +330,7 @@ Throughput: 1,063,458 req/s
 | Memória | 13.5 KB/op |
 | Alocações | 1 por operação |
 
-O analyzer-processa **mais de 1 milhão de requisições por segundo** com latência inferior a 3µs no P95.
+> **Nota Metodológica:** O benchmark primário é o teste `testing.B` do Go (405.961 iterações), o padrão mais rigoroso da linguagem. Os valores de throughput são baseados em amostras menores (700 operações) e servem como referência complementar.
 
 ### Confiabilidade do Detector
 
@@ -277,11 +338,12 @@ O detector foi exaustivamente testado para garantir **0% de falsos positivos**:
 
 ![Todos os Testes](media/allTests.png)
 
-#### Testes de True Positives (Detecção de API Keys)
+#### Testes de True Positives
 
 ![True Positives](media/truePositivesTest.png)
 
 Todos os 17 padrões suportados foram detectados corretamente:
+
 - ✓ openai_key (2 casos)
 - ✓ openai_project_key (2 casos)
 - ✓ anthropic_key (2 casos)
@@ -292,60 +354,56 @@ Todos os 17 padrões suportados foram detectados corretamente:
 
 #### ⚠️ Testes de Falsos Positivos (CRÍTICO)
 
-Este é o teste **mais crítico** para garantir que requisições legítimas não sejam bloqueadas ou modificadas incorretamente:
-
 ![False Positives](media/falsePositivesTest.png)
 
-**Resultado: 0/32 (0.00%)** - ZERO falsos positivos!
+**Resultado: 0/32 (0.00%)** — ZERO falsos positivos.
 
 Casos testados que NÃO foram detectados:
-- ✓ UUIDs (v4): não detectado
-- ✓ MD5/SHA hashes: não detectado
-- ✓ Base64 strings: não detectado
-- ✓ Payloads normais (GPT, Claude, Gemini): não detectado
-- ✓ Nomes de métodos Go: não detectado
-- ✓ URLs e caminhos: não detectado
-- ✓ Tokens de outros serviços: não detectado
-
-Esta taxa de **0% de falsos positivos** é o diferencial que garante confiança no uso em produção.
+- ✓ UUIDs (v4)
+- ✓ MD5/SHA hashes
+- ✓ Base64 strings
+- ✓ Payloads normais (GPT, Claude, Gemini)
+- ✓ Nomes de métodos Go
+- ✓ URLs e caminhos
+- ✓ Tokens de outros serviços
 
 **Resultados dos Testes:**
-- **True Positives**: 17/17 detectados ✓
-- **False Positives**: 0/32 (0.00%) ✓
-- **Precisão**: 100%
 
-Esta taxa de 0% de falsos positivos é crucial para garantir que requisições legítimas não sejam bloqueadas ou modificadas incorretamente.
+| Métrica | Resultado |
+|---|---|
+| True Positives | 17/17 ✓ |
+| False Positives | 0/32 (0.00%) ✓ |
+| Precisão | 100% |
 
 ---
 
-## Registros de Auditoria Expandidos
+## Registros de Auditoria
 
-O ficheiro `galileu_audit.log` será criado ao finalizar a primeira execução, e contém um registo JSON detalhado de cada requisição interceptada, incluindo:
+O ficheiro `galileu_audit.log` é criado automaticamente ao finalizar a primeira execução e contém um registro JSON detalhado de cada requisição interceptada:
 
 - **Identificação**: Timestamp, Request ID, Session ID, Machine ID
 - **Requisição**: Host, Provider, Path, Method, Modelo de LLM
-- **Detecção**: Padrões detectados, contagem, posições de redacção
+- **Detecção**: Padrões detectados, contagem, posições de redação
 - **Payload**: Contagem de mensagens, presença de system prompt, streaming
 - **Performance**: Latência do proxy, duração da análise
 - **Resposta**: Status code, tamanhos de request/response
 
-(Consulte a documentação no repositório para o schema completo dos campos de auditoria.)
+Consulte o ficheiro [markdown/tests.md](markdown/tests.md) para o schema completo dos campos de auditoria.
 
 ---
 
 ## Configuração (galileu.yml)
 
-O Galileu suporta configuração via ficheiro `galileu.yml` para personalizar os padrões de detecção sem recompilar o código.
+O ficheiro `galileu.yml` é **opcional** e deve ser colocado no diretório onde o binário é executado. Se não existir, todos os padrões built-in são ativados automaticamente.
 
 ### Estrutura do Ficheiro
 
-O ficheiro `galileu.yml` deve seguir exatamente esta estrutura:
-
 ```yaml
 port: 9000
+
 analyzer:
 
-  # ─── Padrões embutidos ─────────────────────────────────────────────────
+  # ─── Padrões embutidos ──────────────────────────────────────
   built_in:
     openai_key:         true
     openai_project_key: true
@@ -356,7 +414,7 @@ analyzer:
     discord_token:      true
     aws_key:            true
 
-  # ─── Padrões personalizados ──────────────────────────────────────────────
+  # ─── Padrões personalizados ─────────────────────────────────
   # Para ativar, mude enabled: false para enabled: true
   custom_patterns:
     # ...
@@ -365,44 +423,25 @@ analyzer:
 ### Campos Obrigatórios
 
 | Campo | Tipo | Descrição |
-|-------|------|------------|
-| `port`     | object | Raiz da configuração |
-| `analyzer` | object | Raiz da configuração |
-| `built_in` | object | Contém os padrões embutidos |
+|---|---|---|
+| `port` | integer | Porta de execução do proxy (padrão: 9000) |
+| `analyzer` | object | Raiz da configuração do analyzer |
+| `built_in` | object | Padrões embutidos e seus estados |
 | `custom_patterns` | array | Lista de padrões personalizados |
 
-
-### Porta de execução
-```yaml
- port: 9000
-```
-Você pode escolher a porta de execução da aplicação. Que por default é 9000.
-
-> **Nota:** Lembre-se de mudar o apontamento da sua ferramenta para a porta definida.
-
-
-### Padrões Built-in
-
-Todos os padrões embutidos podem ser ativados ou desativados individualmente:
+### Porta de Execução
 
 ```yaml
-analyzer:
-  built_in:
-    openai_key:         true
-    openai_project_key: true
-    anthropic_key:      true
-    google_key:         true
-    github_token:       true
-    slack_token:        true
-    discord_token:      true
-    aws_key:            true
+port: 9000
 ```
+
+Você pode escolher qualquer porta disponível. O padrão é `9000`.
+
+> **Nota:** Lembre-se de apontar a sua ferramenta de IA para a mesma porta definida aqui.
 
 ### Padrões Customizados
 
-Adicione os seus próprios padrões de dois tipos:
-
-**Regex** — para padrões complexos (use aspas normais `'...'`):
+**Regex** — para padrões complexos:
 ```yaml
 custom_patterns:
   - name: "JWT Token"
@@ -415,94 +454,13 @@ custom_patterns:
 **Literal** — para strings exatas:
 ```yaml
 custom_patterns:
-  - name: "Projectos Confidenciais"
+  - name: "Projetos Confidenciais"
     type: literal
     values:
       - "Operação Phoenix"
-      - "Projecto Stargate"
+      - "Projeto Stargate"
     label: "[CONFIDENTIAL_PROJECT_REDACTED]"
     enabled: true
-```
-
-### Exemplos Completos
-
-**Exemplo com padrão Regex:**
-```yaml
-- name: "Password de Base de Dados"
-  type: regex
-  pattern: 'DB_PASSWORD\s*=\s*[\x27]?[^\s\x27]+'
-  label: "[DB_PASSWORD_REDACTED]"
-  enabled: true
-```
-
-**Exemplo com padrão Literal:**
-```yaml
-- name: "Tabelas Internas"
-  type: literal
-  values:
-    - "clientes_vip"
-    - "transacoes_internas"
-    - "dados_financeiros_2024"
-  label: "[INTERNAL_TABLE_REDACTED]"
-  enabled: true
-```
-
-### Notas Importantes
-
-1. **Formato YAML**: Use espaços (não tabs) para indentação
-2. **Aspas em Regex**: Use aspas normais `'...'` para definir patterns regex
-3. **Escape**: Caracteres especiais como `\x27` são usados para evitar conflitos com aspas
-4. **Enabled**: Defina `enabled: true` para ativar, `enabled: false` para desativar
-5. **Label**: O texto de substituição deve ser único e descritivo
-
-> **Nota:** Se o ficheiro `galileu.yml` não existir, o Galileu usa todos os padrões builtin activados por omissão.
-> Para um guia completo, consulte o ficheiro `galileu.yml.example` no repositório.
-
----
-
-## Resolução de Problemas
-
-### "Falha ao ler certificado CA"
-Remova os ficheiros `galileu-ca.pem` e `galileu-ca-key.pem` e execute novamente. O certificado será regenerado automaticamente.
-
-### Windows: "Privilégios de administrador necessários"
-Execute o `galileu.exe` como Administrador (clique direito → "Executar como administrador").
-
-### Linux: Erro de certificado SSL/TLS
-Certifique-se de que instalou o certificado conforme as instruções na secção "Configuração do Certificado CA".
-
----
-
-## Testes
-
-Pode verificar personalmente a confiabilidade e performance do analyzer executando os testes:
-
-### Testes Built-in (Padrões do Código)
-
-```bash
-# Todos os testes do analyzer
-go test -v -run "TestAnalyzer" ./internal/guardian/...
-
-# True positives (built-in)
-go test -v -run "TestAnalyzerTruePositives" ./internal/guardian/...
-
-# False positives (built-in)
-go test -v -run "TestAnalyzerNoFalsePositives" ./internal/guardian/...
-```
-
-### Testes de Padrões Customizados (galileu.yml)
-
-Estes testes validam os padrões configuráveis via `galileu.yml`:
-
-```bash
-# Padrões customizados tipo regex
-go test -v -run "TestAnalyzerCustomPatternsRegex" ./internal/guardian/...
-
-# Padrões customizados tipo literal
-go test -v -run "TestAnalyzerCustomPatternsLiteral" ./internal/guardian/...
-
-# False positives (customizados)
-go test -v -run "TestAnalyzerCustomPatternsNoFalsePositives" ./internal/guardian/...
 ```
 
 #### Resultados dos Testes Customizados
@@ -522,26 +480,87 @@ go test -v -run "TestAnalyzerCustomPatternsNoFalsePositives" ./internal/guardian
 - Tabelas Internas: 5/5 ✓
 - Projetos Confidenciais: 5/5 ✓
 
+### Notas Importantes
+
+1. **Formato YAML**: Use espaços (não tabs) para indentação
+2. **Aspas em Regex**: Use aspas simples `'...'` para patterns regex
+3. **Escape**: Use `\x27` para evitar conflitos com aspas em patterns
+4. **Enabled**: `enabled: true` para ativar, `enabled: false` para desativar
+5. **Label**: O texto de substituição deve ser único e descritivo
+
+---
+
+## Testes
+
+Verifique pessoalmente a confiabilidade e performance do analyzer:
+
+### Testes Built-in
+
+```bash
+# Todos os testes do analyzer
+go test -v -run "TestAnalyzer" ./internal/guardian/...
+
+# True positives
+go test -v -run "TestAnalyzerTruePositives" ./internal/guardian/...
+
+# False positives
+go test -v -run "TestAnalyzerNoFalsePositives" ./internal/guardian/...
+```
+
+### Testes de Padrões Customizados
+
+```bash
+# Regex customizado
+go test -v -run "TestAnalyzerCustomPatternsRegex" ./internal/guardian/...
+
+# Literal customizado
+go test -v -run "TestAnalyzerCustomPatternsLiteral" ./internal/guardian/...
+
+# False positives customizados
+go test -v -run "TestAnalyzerCustomPatternsNoFalsePositives" ./internal/guardian/...
+```
+
 ### Benchmarks e Performance
 
 ```bash
-# Benchmarks
 go test -bench=. -benchmem ./internal/guardian/...
-
-# Testes de performance
 go test -v -run "TestAnalyzerLatency|TestAnalyzerThroughput" ./internal/guardian/...
 ```
 
-Ou consulte o ficheiro [markdown/tests.md](markdown/tests.md) para referência completa.
+---
+
+## Resolução de Problemas
+
+**"Falha ao ler certificado CA"**
+Remova os ficheiros `galileu-ca.pem` e `galileu-ca-key.pem` e execute novamente. O certificado será regenerado automaticamente.
+
+**Windows: "Privilégios de administrador necessários"**
+Execute o `galileu.exe` como Administrador (clique direito → "Executar como administrador").
+
+**Linux: Erro de certificado SSL/TLS**
+Certifique-se de que instalou o certificado conforme as instruções na secção "Configuração do Certificado CA".
 
 ---
 
 ## Segurança
 
-- A chave privada (`galileu-ca-key.pem`) é gerada localmente e **nunca** sai da sua máquina.
-- **Nunca** efetue commit dos ficheiros `.pem` para o repositório — confirme que o `.gitignore` está atualizado.
-- O certificado CA é válido por **10 anos** e utiliza chave **RSA 4096-bit**.
-- O proxy atua exclusivamente sobre as ferramentas que configurarem explicitamente a porta **9000**.
+- A chave privada (`galileu-ca-key.pem`) é gerada localmente e **nunca** sai da sua máquina
+- **Nunca** efetue commit dos ficheiros `.pem` para o repositório
+- O certificado CA é válido por **10 anos** com chave **RSA 4096-bit**
+- O proxy atua exclusivamente sobre as ferramentas que configurarem a porta definida
+
+> Os ficheiros `SECURITY.md` (instruções para reporte de vulnerabilidades) e `CONTRIBUTING.md` estão em desenvolvimento e serão adicionados em breve.
+
+---
+
+## Roadmap
+
+| Ordem | Feature | Descrição |
+|---|---|---|
+| 1 | **Integração com Gemini CLI + Claude Code** | Suporte nativo para interceptação e governança de tráfego |
+| 2 | **Integração com GitHub Copilot (VSCode)** | Sanitização de requisições dentro do Visual Studio Code |
+| 3 | **TUI (Terminal User Interface)** | Interface interativa para configuração e monitorização em tempo real |
+| 4 | **Instalação via Homebrew** | `brew install galileu` |
 
 ---
 
