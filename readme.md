@@ -25,7 +25,7 @@
 
 ![Arquitetura do Sistema](media/SystemArchitecture.png)
 
-*Diagrama da arquitetura do sistema
+*Diagrama da arquitetura e funcioanmento do sistema 
 ---
 
 ## Compilação
