@@ -157,7 +157,7 @@ scripts\start.bat
 | Requisito | Detalhe |
 |---|---|
 | **Sistema Operacional** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
-| **Go** | Versão 1.25.0 ou superior (necessário apenas para compilação) |
+| **Go** | Versão 1.25 ou superior (necessário apenas para compilação) |
 | **Privilégios** | macOS: `sudo` na primeira execução; Windows: Administrador |
 
 ---
