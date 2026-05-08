@@ -78,42 +78,13 @@ jobs:
           body: |
             ## Galileu ${{ github.ref_name }}
 
-            Proxy reverso MITM de segurança e governança para LLMs.
-            Intercepta, sanitiza e audita dados sensíveis antes que cheguem aos provedores de IA.
-
-            ### ✨ Novidades desta versão
-
-            - ✅ **Testes expandidos**: Cobertura de testes unitários e integração
-            - 📊 **Benchmarks de performance**: Métricas de latência e throughput do proxy
-            - 🔍 **Detecção refinada**: Padrões regex e literais configuráveis via `galileu.yml`
-            - 📝 **Documentação atualizada**: README com diagramas, mídias e guia de configuração
-            - 🔒 **Segurança reforçada**: Documentação explícita sobre o certificado CA local
-
-            ### Plataformas
-
-            | Plataforma | Arquivo |
-            |---|---|
-            | macOS Apple Silicon | galileu-darwin-arm64 |
-            | macOS Intel | galileu-darwin-amd64 |
-            | Linux x86_64 | galileu-linux-amd64 |
-            | Windows x86_64 | galileu-windows-amd64.exe |
-
-            ### Provedores Suportados
-
-            OpenCode, OpenAI, Anthropic (Claude), Google Gemini, Cohere e Mistral.
-
-            ### Início rápido
-
-            1. Faça o download do binário da sua plataforma abaixo
-            2. macOS/Linux: `chmod +x galileu-*` e execute o binário
-            3. Windows: execute `galileu-windows-amd64.exe` como Administrador
-            4. Configure sua ferramenta de IA para usar o proxy `http://127.0.0.1:9000`
-
-            > O certificado CA é gerado **apenas na sua máquina**. Veja o README para detalhes.
-
-            ### Licença
-
-            Apache 2.0 — Bruno Dantas de Oliveira Casé
+            Versão oficial de lançamento do Galileu CLI. Esta release inclui os seguintes artefatos:
+            - galileu-darwin-arm64
+            - galileu-darwin-amd64
+            - galileu-linux-amd64
+            - galileu-windows-amd64.exe
+            
+           
           files: |
             dist/*
           draft: false
