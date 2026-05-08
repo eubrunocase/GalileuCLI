@@ -71,19 +71,6 @@ jobs:
           cd dist
           sha256sum * > checksums.txt
 
-      - name: Generate checksums table
-        id: checksums
-        run: |
-          echo '```' > checksums_table.md
-          echo '| Arquivo | SHA256 |' >> checksums_table.md
-          echo '|---------|--------|' >> checksums_table.md
-          while read -r hash file; do
-            echo "| $file | \`$hash\` |" >> checksums_table.md
-          done < dist/checksums.txt
-          echo '```' >> checksums_table.md
-          cat checksums_table.md >> $GITHUB_OUTPUT
-          echo "table=$(cat checksums_table.md)" >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -93,11 +80,9 @@ jobs:
 
             Versão oficial do GalileuCLI
 
-            ### Checksums SHA256
+            ## Checksums SHA256
 
-            ${{ steps.checksums.outputs.table }}
-
-            ### Como verificar
+            Execute o comando abaixo para verificar:
 
             Linux/macOS:
             ```bash
@@ -108,8 +93,9 @@ jobs:
             ```powershell
             Get-FileHash galileu-windows-amd64.exe -Algorithm SHA256
             ```
+
+            O arquivo checksums.txt está anexado nesta release.
             
-           
           files: |
             dist/*
           draft: false
