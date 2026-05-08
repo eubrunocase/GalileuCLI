@@ -213,18 +213,84 @@ Se o binário (`galileu`) for comprometido (malware ou substituição), um ataca
 
 ---
 
-## Execução
+## Comandos
 
-### macOS / Linux
-```bash
-./galileu-darwin-arm64   # ou o binário da sua plataforma
-./scripts/start.sh
+O binário `galileu` suporta os seguintes subcomandos:
+
+| Comando | Descrição |
+|---------|-----------|
+| `galileu` | Iniciar o proxy |
+| `galileu doctor` | Executar diagnóstico do sistema |
+| `galileu version` | Mostrar versão do binário |
+| `galileu -h` | Mostrar ajuda |
+
+### Diagnóstico (`galileu doctor`)
+
+O comando `doctor` verifica:
+
+- **Certificado CA**: Se o certificado está instalado no repositório do sistema
+- **Porta**: Se a porta configurada está disponível
+- **Variáveis de ambiente**: Se `GALILEU_PORT` está configurada
+
+Exemplo de saída:
+
+```
+=== Diagnostico do Galileu ===
+
+Certificado CA:      [OK] Instalado
+Porta configurada:    [OK] 9000 (padrao)
+Porta disponivel:    [OK] Livre
+
+Tudo OK!
 ```
 
-### Windows
+---
+
+## Compilação e Execução
+
+### Usando Make (Recomendado)
+
+O Makefile facilita a compilação e execução:
+
 ```bash
-galileu-windows-amd64.exe
-scripts\start.bat
+# Mostrar ajuda
+make help
+
+# Compilar para a plataforma atual
+make build
+
+# Executar o proxy
+make run
+
+# Executar diagnóstico
+make doctor
+
+# Mostrar versão
+make version
+
+# Limpar binários
+make clean
+```
+
+### Compilação Multiplataforma
+
+```bash
+make build-all          # Compilar para macOS, Windows e Linux
+make build-mac-arm      # macOS Apple Silicon (M1/M2/M3)
+make build-mac-intel    # macOS Intel
+make build-windows      # Windows
+make build-linux        # Linux
+```
+
+### Execução Direta (Sem Make)
+
+Após compilado, você pode executar o binário diretamente:
+
+```bash
+./galileu               # iniciar proxy
+./galileu doctor        # verificar diagnóstico
+./galileu version       # mostrar versão
+./galileu -h            # mostrar ajuda
 ```
 
 > **Nota:** Certifique-se de que o OpenCode (ou outra ferramenta) está configurado para usar o proxy na porta **9000**.

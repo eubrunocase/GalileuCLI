@@ -7,20 +7,99 @@ import (
 	"syscall"
 
 	"Galileu/internal/ca"
+	"Galileu/internal/doctor"
 	"Galileu/internal/guardian"
 )
 
+const version = "1.0.0"
+
 func main() {
-	fmt.Println(`                                                                   
-  ▒███▒   ██   █      █████  █      ██████ █    █
- ░█▒ ░█   ██   █        █    █      █      █    █
- █▒      ▒██▒  █        █    █      █      █    █
- █       ▓▒▒▓  █        █    █      █      █    █
- █   ██  █░░█  █        █    █      ██████ █    █
- █    █  █  █  █        █    █      █      █    █
- █▒   █ ▒████▒ █        █    █      █      █    █
- ▒█░ ░█ ▓▒  ▒▓ █        █    █      █      █▒  ▒█
-  ▒███▒ █░  ░█ ██████ █████  ██████ ██████  ████ `)
+	args := os.Args[1:]
+
+	if len(args) == 0 {
+		runProxy()
+		return
+	}
+
+	switch args[0] {
+	case "doctor":
+		runDoctor()
+	case "version", "--version", "-v":
+		runVersion()
+	case "start":
+		runProxy()
+	case "-h", "--help", "help":
+		printHelp()
+	default:
+		fmt.Printf("Comando desconhecido: %s\n", args[0])
+		printHelp()
+		os.Exit(1)
+	}
+}
+
+func printHelp() {
+	fmt.Println(`Galileu - Proxy de Segurança para LLMs
+
+Uso:
+  galileu              Iniciar o proxy
+  galileu doctor       Executar diagnóstico do sistema
+  galileu version      Mostrar versão do binário
+
+Exemplos:
+  galileu              Inicia o proxy na porta 9000
+  galileu doctor       Verifica certificado, porta e variáveis
+  galileu -h           Mostra esta ajuda`)
+}
+
+func runVersion() {
+	fmt.Printf("Galileu v%s\n", version)
+}
+
+func runDoctor() {
+	result, err := doctor.Diagnose()
+	if err != nil {
+		fmt.Printf("[ERRO] %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("=== Diagnostico do Galileu ===\n")
+
+	fmt.Printf("Certificado CA:      ")
+	if result.CertificateInstalled {
+		fmt.Println("[OK] Instalado")
+	} else {
+		fmt.Println("[FALHA] Nao instalado")
+	}
+
+	fmt.Printf("Porta configurada:    ")
+	if result.EnvPortConfigured {
+		fmt.Printf("[OK] %d (via GALILEU_PORT)\n", result.PortNumber)
+	} else {
+		fmt.Printf("[OK] %d (padrao)\n", result.PortNumber)
+	}
+
+	fmt.Printf("Porta disponivel:    ")
+	if result.PortAvailable {
+		fmt.Println("[OK] Livre")
+	} else {
+		fmt.Println("[FALHA] Ja em uso")
+	}
+
+	fmt.Println("")
+
+	if len(result.Errors) > 0 {
+		fmt.Println("Problemas encontrados:")
+		for _, err := range result.Errors {
+			fmt.Printf("  - %s\n", err)
+		}
+		os.Exit(1)
+	}
+
+	fmt.Println("Tudo OK!")
+}
+
+func runProxy() {
+	printBanner()
 
 	certPath, keyPath := ca.ResolvePaths(ca.CertFile, ca.KeyFile)
 
@@ -54,4 +133,15 @@ func main() {
 	guardian.CloseGuardian()
 	guardian.CloseAuditLogger()
 	fmt.Println("[GALILEU] Log de auditoria persistido com sucesso.")
+}
+
+func printBanner() {
+	fmt.Println(`
+ ██████╗  █████╗ ██╗     ██╗██╗     ███████╗██╗   ██╗
+██╔════╝ ██╔══██╗██║     ██║██║     ██╔════╝██║   ██║
+██║  ███╗███████║██║     ██║██║     █████╗  ██║   ██║
+██║   ██║██╔══██║██║     ██║██║     ██╔══╝  ██║   ██║
+╚██████╔╝██║  ██║███████╗██║███████╗███████╗╚██████╔╝
+ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚══════╝ ╚═════╝ 
+                                                      `)
 }
