@@ -183,6 +183,34 @@ galileu-ca.pem
 
 **NUNCA** remova estas linhas do `.gitignore`. A chave privada (`galileu-ca-key.pem`) é o que permite ao Galileu fazer o MITM — se ela for exposta, um atacante pode criar certificados falsificados em seu nome.
 
+### Riscos de Segurança
+
+#### Vazamento do Certificado CA
+
+Se a chave privada (`galileu-ca-key.pem`) vazar, um atacante pode:
+
+- Criar certificados SSL válidos para **qualquer domínio** (Google, AWS, bancos, etc.)
+- Interceptar todo o tráfego HTTPS da rede onde o certificado for confiar
+- Realizar ataques de MITM sofisticados sem que o usuário perceba
+- Assinar certificados que serão trustados por qualquer máquina que tenha o certificado CA instalado
+
+**Consequência**: Qualquer dispositivo que tenha o certificado CA do Galileu instalado passa a confiar em certificados fraudulentos criados pelo atacante.
+
+#### Comprometimento do Binário
+
+Se o binário (`galileu`) for comprometido (malware ou substituição), um atacante pode:
+
+- Modificar o comportamento do proxy para exfiltrar dados sensíveis das requisições
+- Armazenar em log todas as mensagens enviadas aos provedores de LLM
+- Alterar as respostas dos LLMs antes de retorná-las ao cliente
+- Usar a mesma infraestrutura de proxy para ataques adicionais
+
+**Mitigação**:
+- Sempre verifique a integridade do binário (checksums, assinaturas)
+- Baixe binários apenas de fontes oficiais
+- Mantenha o sistema operacional e dependências atualizados
+- Utilize ferramentas de detecção de integridade (ex: AIDE, Tripwire)
+
 ---
 
 ## Execução
