@@ -207,7 +207,12 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 				})
 
 				if result.Modified {
-					fmt.Printf("[GALILEU] Interceptado em %s: %d dado(s) sensivel(is) removido(s).\n", r.Host, result.PatternCount)
+					if analyzer.DryRun {
+						fmt.Printf("[GALILEU] [DRY-RUN] Detectado em %s: %d dado(s) sensivel(is) - NAO modificado.\n", r.Host, result.PatternCount)
+						fmt.Printf("[GALILEU]         Padroes: %v\n", result.DetectedPatterns)
+					} else {
+						fmt.Printf("[GALILEU] Interceptado em %s: %d dado(s) sensivel(is) removido(s).\n", r.Host, result.PatternCount)
+					}
 					r.Body = io.NopCloser(bytes.NewReader(result.Result))
 					r.ContentLength = int64(len(result.Result))
 					r.Header.Set("Content-Length", fmt.Sprintf("%d", len(result.Result)))
@@ -215,7 +220,6 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 						r.Header.Del("Transfer-Encoding")
 					}
 				} else {
-					// ✅ CORREÇÃO: Restaurar body sem re-ler
 					r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 					r.ContentLength = int64(len(bodyBytes))
 				}

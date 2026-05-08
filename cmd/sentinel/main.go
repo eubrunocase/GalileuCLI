@@ -16,39 +16,68 @@ const version = "1.0.0"
 func main() {
 	args := os.Args[1:]
 
-	if len(args) == 0 {
-		runProxy()
+	dryRun := containsArg(args, "--dry-run")
+
+	filteredArgs := filterArgs(args, "--dry-run")
+
+	if len(filteredArgs) == 0 {
+		runProxy(dryRun)
 		return
 	}
 
-	switch args[0] {
+	switch filteredArgs[0] {
 	case "doctor":
 		runDoctor()
 	case "version", "--version", "-v":
 		runVersion()
 	case "start":
-		runProxy()
+		runProxy(dryRun)
 	case "-h", "--help", "help":
 		printHelp()
 	default:
-		fmt.Printf("Comando desconhecido: %s\n", args[0])
+		fmt.Printf("Comando desconhecido: %s\n", filteredArgs[0])
 		printHelp()
 		os.Exit(1)
 	}
+}
+
+func filterArgs(args []string, exclude string) []string {
+	result := make([]string, 0)
+	for _, a := range args {
+		if a != exclude {
+			result = append(result, a)
+		}
+	}
+	return result
+}
+
+func containsArg(args []string, arg string) bool {
+	for _, a := range args {
+		if a == arg {
+			return true
+		}
+	}
+	return false
+}
+
+func startsWithDash(s string) bool {
+	return len(s) > 0 && s[0] == '-'
 }
 
 func printHelp() {
 	fmt.Println(`Galileu - Proxy de Segurança para LLMs
 
 Uso:
-  galileu              Iniciar o proxy
-  galileu doctor       Executar diagnóstico do sistema
-  galileu version      Mostrar versão do binário
+  galileu               Iniciar o proxy
+  galileu --dry-run     Iniciar proxy em modo DRY-RUN (apenas detectar, não modificar)
+  galileu doctor        Executar diagnóstico do sistema
+  galileu version       Mostrar versão do binário
 
 Exemplos:
-  galileu              Inicia o proxy na porta 9000
-  galileu doctor       Verifica certificado, porta e variáveis
-  galileu -h           Mostra esta ajuda`)
+  galileu               Inicia o proxy na porta 9000
+  galileu --dry-run     Inicia proxy em modo teste (mostra o que seria redatado)
+  galileu doctor        Verifica certificado, porta e variáveis
+  galileu -h            Mostra esta ajuda`)
 }
 
 func runVersion() {
@@ -98,7 +127,7 @@ func runDoctor() {
 	fmt.Println("Tudo OK!")
 }
 
-func runProxy() {
+func runProxy(dryRun bool) {
 	printBanner()
 
 	certPath, keyPath := ca.ResolvePaths(ca.CertFile, ca.KeyFile)
@@ -119,6 +148,11 @@ func runProxy() {
 		os.Exit(1)
 	}
 	analyzer := guardian.NewAnalyzer(patterns)
+	analyzer.DryRun = dryRun
+
+	if dryRun {
+		fmt.Println("[GALILEU] Modo DRY-RUN ativo - apenas detectando, sem modificar payloads.")
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

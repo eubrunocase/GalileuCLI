@@ -259,9 +259,31 @@ O binário `galileu` suporta os seguintes subcomandos:
 | Comando | Descrição |
 |---------|-----------|
 | `galileu` | Iniciar o proxy |
+| `galileu --dry-run` | Iniciar proxy em modo DRY-RUN (apenas detectar, não modificar) |
 | `galileu doctor` | Executar diagnóstico do sistema |
 | `galileu version` | Mostrar versão do binário |
 | `galileu -h` | Mostrar ajuda |
+
+### Modo DRY-RUN
+
+O modo `--dry-run` permite testar a detecção de dados sensíveis **sem modificar os payloads**:
+
+```bash
+./galileu --dry-run
+```
+
+Quando ativado:
+- O proxy analisa todas as requisições normalmente
+- Detecta padrões sensíveis e exibe quais dados seriam redatados
+- **Não modifica** o payload original - mantém intacto
+- Útil para debugging e verificação de padrões de detecção
+
+Exemplo de saída:
+```
+[GALILEU] Modo DRY-RUN ativo - apenas detectando, sem modificar payloads.
+[GALILEU] [DRY-RUN] Detectado em api.openai.com: 2 dado(s) sensivel(is) - NAO modificado.
+[GALILEU]         Padroes: [openai_key, github_token]
+```
 
 ### Diagnóstico (`galileu doctor`)
 
@@ -327,6 +349,7 @@ Após compilado, você pode executar o binário diretamente:
 
 ```bash
 ./galileu               # iniciar proxy
+./galileu --dry-run     # iniciar proxy em modo DRY-RUN
 ./galileu doctor        # verificar diagnóstico
 ./galileu version       # mostrar versão
 ./galileu -h            # mostrar ajuda

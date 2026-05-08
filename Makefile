@@ -87,6 +87,10 @@ run:
 	@echo "[Galileu] A iniciar o proxy..."
 	go run $(CMD_PATH)
 
+run-dry-run:
+	@echo "[Galileu] A iniciar o proxy em modo DRY-RUN..."
+	go run $(CMD_PATH) --dry-run
+
 doctor:
 	@echo "[Galileu] A executar diagnóstico..."
 	go run $(CMD_PATH) doctor
@@ -150,6 +154,7 @@ help:
 	@echo ""
 	@echo "Execução:"
 	@echo "  make run             - Iniciar o proxy"
+	@echo "  make run-dry-run     - Iniciar proxy em modo DRY-RUN"
 	@echo "  make doctor          - Executar diagnóstico"
 	@echo "  make version         - Mostrar versão"
 	@echo ""
@@ -163,4 +168,4 @@ help:
 	@echo "  make clean           - Remover binários"
 	@echo "  make help            - Mostrar esta ajuda"
 
-.PHONY: build build-mac-arm build-mac-intel build-windows build-linux build-all checksums run doctor version uninstall-cert uninstall-cert-macos uninstall-cert-linux uninstall-cert-windows clean help
+.PHONY: build build-mac-arm build-mac-intel build-windows build-linux build-all checksums run run-dry-run doctor version uninstall-cert uninstall-cert-macos uninstall-cert-linux uninstall-cert-windows clean help

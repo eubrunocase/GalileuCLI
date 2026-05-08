@@ -30,6 +30,7 @@ type AnalysisResult struct {
 
 type Analyzer struct {
 	compiledPatterns []CompiledPattern
+	DryRun           bool
 }
 
 // NewAnalyzer cria um Analyzer com os padrões fornecidos externamente.
@@ -57,7 +58,9 @@ func (a *Analyzer) Analyze(data []byte) AnalysisResult {
 			result.DetectedPatterns = append(result.DetectedPatterns, p.Name)
 			result.PatternCount += len(matches)
 			result.RedactionPositions = append(result.RedactionPositions, "body")
-			result.Result = p.Regex.ReplaceAll(result.Result, []byte(p.Label))
+			if !a.DryRun {
+				result.Result = p.Regex.ReplaceAll(result.Result, []byte(p.Label))
+			}
 		}
 	}
 
