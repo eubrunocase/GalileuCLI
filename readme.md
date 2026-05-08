@@ -646,6 +646,27 @@ Certifique-se de que instalou o certificado conforme as instruções na secção
 - O certificado CA é válido por **10 anos** com chave **RSA 4096-bit**
 - O proxy atua exclusivamente sobre as ferramentas que configurarem a porta definida
 
+### Verificação de Integridade
+
+Cada binário publicado nas releases inclui um checksum SHA256. Para verificar a integridade do binário baixado:
+
+**Linux/macOS:**
+```bash
+sha256sum galileu-linux-amd64
+# Compare com o checksum publicado na release
+```
+
+**Windows (PowerShell):**
+```powershell
+Get-FileHash galileu-windows-amd64.exe -Algorithm SHA256
+# Compare com o checksum publicado na release
+```
+
+O arquivo `checksums.txt` contém todos os checksums e pode ser verificado com:
+```bash
+sha256sum -c checksums.txt
+```
+
 Consulte o ficheiro [SECURITY.md](SECURITY.md) para obter informações acerca do reporte de vulnerabilidades.
 
 ---

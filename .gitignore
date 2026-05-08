@@ -8,6 +8,13 @@ pk.p12
 galileu
 galileu.exe
 galileu-intel
+galileu-darwin-arm64
+galileu-darwin-amd64
+galileu-windows-amd64.exe
+galileu-linux-amd64
+
+# Checksums (gerado automaticamente)
+checksums.txt
 
 # Logs de auditoria
 galileu_audit.log

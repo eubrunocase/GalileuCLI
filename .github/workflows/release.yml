@@ -71,6 +71,19 @@ jobs:
           cd dist
           sha256sum * > checksums.txt
 
+      - name: Generate checksums table
+        id: checksums
+        run: |
+          echo '```' > checksums_table.md
+          echo '| Arquivo | SHA256 |' >> checksums_table.md
+          echo '|---------|--------|' >> checksums_table.md
+          while read -r hash file; do
+            echo "| $file | \`$hash\` |" >> checksums_table.md
+          done < dist/checksums.txt
+          echo '```' >> checksums_table.md
+          cat checksums_table.md >> $GITHUB_OUTPUT
+          echo "table=$(cat checksums_table.md)" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -78,11 +91,23 @@ jobs:
           body: |
             ## Galileu ${{ github.ref_name }}
 
-            Versão oficial de lançamento do Galileu CLI. Esta release inclui os seguintes artefatos:
-            - galileu-darwin-arm64
-            - galileu-darwin-amd64
-            - galileu-linux-amd64
-            - galileu-windows-amd64.exe
+            Versão oficial do GalileuCLI
+
+            ### Checksums SHA256
+
+            ${{ steps.checksums.outputs.table }}
+
+            ### Como verificar
+
+            Linux/macOS:
+            ```bash
+            sha256sum -c checksums.txt
+            ```
+
+            Windows (PowerShell):
+            ```powershell
+            Get-FileHash galileu-windows-amd64.exe -Algorithm SHA256
+            ```
             
            
           files: |
