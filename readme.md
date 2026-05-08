@@ -163,7 +163,7 @@ sudo security add-trusted-cert -d -r trustRoot \
 O Galileu instala automaticamente o certificado CA no repositório de certificados do sistema ao executar como **Administrador**. Basta executar `galileu.exe` com privilégios administrativos.
 
 #### Linux
-No Linux, a instalação é manual. Após compilar, execute:
+O Galileu instala automaticamente o certificado CA no repositório de certificados do sistema ao executar com privilégios de **sudo** (na primeira execução será solicitada a senha). Caso prefira instalar manualmente:
 
 ```bash
 sudo cp galileu-ca.pem /usr/local/share/ca-certificates/galileu.crt
@@ -210,7 +210,7 @@ scripts\start.bat
 | Requisito | Detalhe |
 |---|---|
 | **Sistema Operacional** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
-| **Privilégios** | macOS: `sudo` na primeira execução; Windows: Administrador |
+| **Privilégios** | macOS/Linux: `sudo` na primeira execução; Windows: Administrador |
 
 > Não é necessário ter Go instalado.
 
@@ -220,7 +220,7 @@ scripts\start.bat
 |---|---|
 | **Sistema Operacional** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
 | **Go** | Versão 1.25 ou superior |
-| **Privilégios** | macOS: `sudo` na primeira execução; Windows: Administrador |
+| **Privilégios** | macOS/Linux: `sudo` na primeira execução; Windows: Administrador |
 
 ---
 
@@ -358,7 +358,7 @@ Todos os 17 padrões suportados foram detectados corretamente:
 
 ![False Positives](media/falsePositivesTest.png)
 
-**Resultado: 0/32 (0.00%)** — ZERO falsos positivos.
+**Resultado: 0/32 (0.00%)** — ZERO falsos positivos nos casos de testes atuais(confira em /guardian/analyzer_detection_test.go).
 
 Casos testados que NÃO foram detectados:
 - ✓ UUIDs (v4)
