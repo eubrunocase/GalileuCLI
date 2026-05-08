@@ -3,13 +3,14 @@
 # Uso: make <target>
 #
 # Comandos disponíveis:
-#   make build        - Compilar para a plataforma atual
-#   make build-all    - Compilar para todas as plataformas
-#   make checksums    - Gerar checksums SHA256 de todos os binários
-#   make run          - Executar o proxy
-#   make doctor       - Executar diagnóstico do sistema
-#   make version      - Mostrar versão
-#   make clean        - Remover binários
+#   make build              - Compilar para a plataforma atual
+#   make build-all          - Compilar para todas as plataformas
+#   make checksums          - Gerar checksums SHA256 de todos os binários
+#   make run                - Executar o proxy
+#   make doctor             - Executar diagnóstico do sistema
+#   make version            - Mostrar versão
+#   make uninstall-cert     - Desinstalar o certificado CA do sistema
+#   make clean              - Remover binários
 
 BINARY_NAME=galileu
 CMD_PATH=./cmd/sentinel/main.go
@@ -94,6 +95,38 @@ version:
 	@echo "[Galileu] A obter versão..."
 	go run $(CMD_PATH) version
 
+# ─── Certificados ────────────────────────────────────────────────────────────────
+
+uninstall-cert:
+	@echo "[Galileu] A desinstalar o certificado CA..."
+	@echo ""
+	@echo "Este comando remove o certificado CA 'Galileu Local CA' do sistema."
+	@echo "Execute-o com privilégios adequados (sudo no macOS/Linux, Administrador no Windows)."
+	@echo ""
+	@echo "Selecione o seu sistema operacional:"
+	@echo "  make uninstall-cert-macos    - macOS"
+	@echo "  make uninstall-cert-linux    - Linux"
+	@echo "  make uninstall-cert-windows  - Windows"
+
+uninstall-cert-macos:
+	@echo "[Galileu] A desinstalar certificado do macOS Keychain..."
+	@echo "[Galileu] Sera solicitada a senha de administrador."
+	@sudo security remove-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "Galileu Local CA"
+	@echo "[Galileu] Certificado CA removido do Keychain."
+
+uninstall-cert-linux:
+	@echo "[Galileu] A desinstalar certificado do Linux..."
+	@echo "[Galileu] Sera solicitada a senha de administrador."
+	@sudo rm -f /usr/local/share/ca-certificates/galileu.crt
+	@sudo update-ca-certificates
+	@echo "[Galileu] Certificado CA removido do sistema."
+
+uninstall-cert-windows:
+	@echo "[Galileu] A desinstalar certificado do Windows..."
+	@echo "[Galileu] Execute este comando como Administrador (PowerShell)."
+	@certutil -delstore -f Root "Galileu Local CA" || echo "[Galileu] Certificado nao encontrado ou ja removido."
+	@echo "[Galileu] Certificado CA removido do repositorio."
+
 # ─── Utilitários ────────────────────────────────────────────────────────────────
 
 clean:
@@ -120,8 +153,14 @@ help:
 	@echo "  make doctor          - Executar diagnóstico"
 	@echo "  make version         - Mostrar versão"
 	@echo ""
+	@echo "Certificados:"
+	@echo "  make uninstall-cert          - Desinstalar certificado CA (mostrar opções)"
+	@echo "  make uninstall-cert-macos   - Desinstalar certificado do macOS"
+	@echo "  make uninstall-cert-linux   - Desinstalar certificado do Linux"
+	@echo "  make uninstall-cert-windows - Desinstalar certificado do Windows"
+	@echo ""
 	@echo "Outros:"
 	@echo "  make clean           - Remover binários"
 	@echo "  make help            - Mostrar esta ajuda"
 
-.PHONY: build build-mac-arm build-mac-intel build-windows build-linux build-all checksums run doctor version clean help
+.PHONY: build build-mac-arm build-mac-intel build-windows build-linux build-all checksums run doctor version uninstall-cert uninstall-cert-macos uninstall-cert-linux uninstall-cert-windows clean help

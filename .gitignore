@@ -34,3 +34,4 @@ galileu-ca-key.pem
 galileu-ca.pem
 
 galileu.yml
+.env.fakeYmlTest

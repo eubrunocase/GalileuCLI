@@ -170,6 +170,45 @@ sudo cp galileu-ca.pem /usr/local/share/ca-certificates/galileu.crt
 sudo update-ca-certificates
 ```
 
+### Desinstalação do Certificado CA
+
+Se precisar remover o certificado CA do seu sistema, utilize os comandos abaixo:
+
+#### macOS
+```bash
+sudo security remove-trusted-cert -d -r trustRoot \
+  -k /Library/Keychains/System.keychain "Galileu Local CA"
+```
+
+Ou use o Makefile:
+```bash
+make uninstall-cert-macos
+```
+
+#### Linux
+```bash
+sudo rm /usr/local/share/ca-certificates/galileu.crt
+sudo update-ca-certificates
+```
+
+Ou use o Makefile:
+```bash
+make uninstall-cert-linux
+```
+
+#### Windows
+Execute no PowerShell como Administrador:
+```powershell
+certutil -delstore -f Root "Galileu Local CA"
+```
+
+Ou use o Makefile (execute como Administrador):
+```bash
+make uninstall-cert-windows
+```
+
+> **Nota:** Após desinstalar o certificado, o proxy não funcionará até que o certificado seja reinstalado. Para reinstalar, basta executar o Galileu novamente.
+
 ### ⚠️ Proteção dos Ficheiros `.pem`
 
 O seu `.gitignore` **já está configurado** para impedir o commit acidental:
