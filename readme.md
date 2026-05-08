@@ -552,7 +552,7 @@ Certifique-se de que instalou o certificado conforme as instruções na secção
 - O certificado CA é válido por **10 anos** com chave **RSA 4096-bit**
 - O proxy atua exclusivamente sobre as ferramentas que configurarem a porta definida
 
-> Os ficheiros `SECURITY.md` (instruções para reporte de vulnerabilidades) e `CONTRIBUTING.md` estão em desenvolvimento e serão adicionados em breve.
+Consulte o ficheiro [SECURITY.md](SECURITY.md) para obter informações acerca do reporte de vulnerabilidades.
 
 ---
 
