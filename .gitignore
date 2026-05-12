@@ -5,7 +5,7 @@
 pk.p12
 
 # Binários compilados
-galileu
+
 galileu.exe
 galileu-intel
 galileu-darwin-arm64
@@ -36,3 +36,5 @@ galileu-ca.pem
 galileu.yml
 .env.fakeYmlTest
 coverage.out
+
+
