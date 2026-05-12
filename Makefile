@@ -13,7 +13,7 @@
 #   make clean              - Remover binários
 
 BINARY_NAME=galileu
-CMD_PATH=./cmd/sentinel/main.go
+CMD_PATH=./cmd/galileu/main.go
 
 # Binários para cada plataforma
 BINARY_DARWIN_ARM64=galileu-darwin-arm64
@@ -138,6 +138,22 @@ clean:
 	rm -f $(BINARY_NAME) $(BINARY_DARWIN_ARM64) $(BINARY_DARWIN_AMD64) $(BINARY_WINDOWS) $(BINARY_LINUX) checksums.txt
 	@echo "[Galileu] Limpeza concluída."
 
+test:
+	@echo "[Galileu] Executando todos os testes..."
+	go test ./... -v
+	@echo "[Galileu] Testes concluidos."
+
+test-coverage:
+	@echo "[Galileu] Executando testes com cobertura..."
+	go test ./... -coverprofile=coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "[Galileu] Relatorio de cobertura gerado: coverage.html"
+
+benchmarks:
+	@echo "[Galileu] Executando benchmarks..."
+	go test ./internal/guardian/... -bench=. -benchmem
+	@echo "[Galileu] Benchmarks concluidos."
+
 help:
 	@echo "Galileu - Makefile de compilação"
 	@echo ""
@@ -165,7 +181,10 @@ help:
 	@echo "  make uninstall-cert-windows - Desinstalar certificado do Windows"
 	@echo ""
 	@echo "Outros:"
-	@echo "  make clean           - Remover binários"
-	@echo "  make help            - Mostrar esta ajuda"
+	@echo "  make clean           - Remover binarios"
+	@echo "  make test           - Executar todos os testes"
+	@echo "  make test-coverage  - Executar testes com relatorio de cobertura"
+	@echo "  make benchmarks     - Executar benchmarks de performance"
+	@echo "  make help           - Mostrar esta ajuda"
 
-.PHONY: build build-mac-arm build-mac-intel build-windows build-linux build-all checksums run run-dry-run doctor version uninstall-cert uninstall-cert-macos uninstall-cert-linux uninstall-cert-windows clean help
+.PHONY: build build-mac-arm build-mac-intel build-windows build-linux build-all checksums run run-dry-run doctor version uninstall-cert uninstall-cert-macos uninstall-cert-linux uninstall-cert-windows clean test test-coverage benchmarks help

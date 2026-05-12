@@ -1,4 +1,4 @@
-# Galileu — Proxy de Segurança e Governança para LLMs
+# Galileu — Proxy de Segurança e Governança para Ferramentas de AI
 
 ![License](https://img.shields.io/github/license/eubrunocase/GalileuCLI?style=flat-square)
 ![Latest Release](https://img.shields.io/github/v/release/eubrunocase/GalileuCLI?style=flat-square)
@@ -8,7 +8,26 @@
 
 **Galileu** é uma ferramenta de segurança e governança de dados voltada para o monitoramento e sanitização de informações enviadas a provedores de Inteligência Artificial (LLMs). O projeto adota uma arquitetura de **Proxy Reverso MITM (Man-in-the-Middle)**, atuando como camada inteligente entre a sua ferramenta de desenvolvimento e os servidores das LLMs.
 
-Ferramentas de AI coding como OpenCode, Cursor e GitHub Copilot leem arquivos do projeto inteiro — incluindo `.env`, configs e credenciais — e enviam tudo como contexto para a LLM. O Galileu intercepta essas requisições e redige automaticamente qualquer dado sensível antes que ele saia da sua máquina.
+O Galileu é **agnóstico a ferramentas de AI** — funciona com qualquer ferramenta que permita configurar um proxy customizado: OpenCode, Claude Code, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Codex e muito mais.
+
+---
+
+## Ferramentas Suportadas
+
+O Galileu funciona com qualquer ferramenta de AI que permita configurar um proxy:
+
+| Ferramenta | Detecção Automática | Configuração |
+|---|---|---|
+| OpenCode | ✅ | Padrão |
+| Claude Code | ✅ | Modo `passive` |
+| Cursor | ✅ | Modo `passive` |
+| Windsurf | ✅ | Modo `passive` |
+| GitHub Copilot | ✅ | Modo `passive` |
+| Gemini CLI | ✅ | Padrão |
+| OpenAI API | ✅ | Padrão |
+| Anthropic API | ✅ | Padrão |
+| Google AI API | ✅ | Padrão |
+| Qualquer outra | ✅ | Modo `passive` |
 
 ---
 
@@ -35,6 +54,40 @@ Ferramentas de AI coding como OpenCode, Cursor e GitHub Copilot leem arquivos do
 ![Arquitetura do Sistema](media/SystemArchitecture.png)
 
 *Diagrama da arquitetura e funcionamento do sistema.*
+
+### Fluxo de Processamento
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         GALILEU PROXY                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Request → Filter(Input) → [Is JSON? + Is POST?] →              │
+│                                     │                           │
+│                          ┌──────────┴──────────┐                │
+│                          │                     │                │
+│                   Skip (telemetry)      Analyze (Payload)       │
+│                                              │                  │
+│                                        ┌─────┴─────┐            │
+│                                        │           │            │
+│                                  ┌─────▼───┐   ┌───▼────┐       │
+│                                  │ Has model│  │  Has   │       │
+│                                  │ messages │  │contents│       │
+│                                  │  etc?    │  │  etc?  │       │
+│                                  └─────┬───┘   └────┬───┘       │
+│                                        │            │           │
+│                                        └──────┬─────┘           │
+│                                          Detected!              │
+│                                              │                  │
+│                                    ┌─────────┴─────────┐        │
+│                                    │ Infer Provider    │        │
+│                                    │ from Payload      │        │
+│                                    └─────────┬─────────┘        │
+└─────────────────────────────────────────────┼─────────────────┘
+                                              │
+                                        Analyze for
+                                        sensitive data
+```
 
 ---
 
@@ -121,7 +174,8 @@ make build-all
 │                                                             │
 │  ┌──────────┐    ┌──────────────────┐    ┌──────────┐       │
 │  │ Cliente  │───▶│  Galileu Proxy  │───▶│   LLM    │       │
-│  │ (OpenCode)│◀───│  (localhost:9000)│◀───│ Provider│       │
+│  │ (Claude   │◀───│  (localhost:9000)│◀───│ Provider│       │
+│  │  Code)    │    │                  │    │          │       │
 │  └──────────┘    └──────────────────┘    └──────────┘       │
 │                        │                                    │
 │                        ▼                                    │
@@ -326,8 +380,11 @@ make run
 # Executar diagnóstico
 make doctor
 
-# Mostrar versão
-make version
+# Executar todos os testes
+make test
+
+# Executar benchmarks
+make benchmarks
 
 # Limpar binários
 make clean
@@ -355,7 +412,7 @@ Após compilado, você pode executar o binário diretamente:
 ./galileu -h            # mostrar ajuda
 ```
 
-> **Nota:** Certifique-se de que o OpenCode (ou outra ferramenta) está configurado para usar o proxy na porta **9000**.
+> **Nota:** Certifique-se de que a ferramenta de AI está configurada para usar o proxy na porta **9000**, ou na porta que você configurou.
 
 ---
 
@@ -375,7 +432,7 @@ Após compilado, você pode executar o binário diretamente:
 | Requisito | Detalhe |
 |---|---|
 | **Sistema Operacional** | macOS (Apple Silicon & Intel), Windows 10/11, Linux (amd64) |
-| **Go** | Versão 1.25 ou superior |
+| **Go** | Versão 1.21 ou superior |
 | **Privilégios** | macOS/Linux: `sudo` na primeira execução; Windows: Administrador |
 
 ---
@@ -395,28 +452,122 @@ Galileu/
 │   ├── start.sh             # Script shell para iniciar o OpenCode com proxy (macOS/Linux)
 │   └── start.bat            # Script batch para iniciar o OpenCode com proxy (Windows)
 ├── cmd/
-│   └── sentinel/
+│   └── galileu/
 │       └── main.go          # Ponto de entrada
 ├── internal/
 │   ├── ca/                  # Geração e gestão do certificado CA
+│   ├── doctor/              # Diagnóstico do sistema
 │   └── guardian/            # Proxy MITM, Analyzer, Audit, instalação de certificado por plataforma
 └── galileu_audit.log        # Registo de auditoria (gerado automaticamente na primeira execução)
 ```
 
 ---
 
-## Hosts Monitorizados
+## Detecção Automática de Ferramentas de AI
 
-O Galileu intercepta requisições para os seguintes provedores:
+O Galileu é **agnóstico a ferramentas de AI**. Ele detecta automaticamente requisições de AI através da análise do payload, não do host.
+
+### Como Funciona
+
+O Galileu analisa o corpo (body) da requisição JSON e detecta se é uma requisição de AI através de campos característicos:
+
+| Campo | Provedor Típico |
+|---|---|
+| `model` | Qualquer API de LLM |
+| `messages` | OpenAI, Claude Code, Cursor, Windsurf |
+| `contents` | Google Gemini |
+| `anthropic_version` | Anthropic API |
+| `prompt` | Cohere, outros |
+| `input` | Algumas APIs |
+| `generationConfig` | Google Gemini |
+
+### Provider Inference
+
+O provider é inferido automaticamente do payload:
+
+| Provider | Detectado Por |
+|---|---|
+| `openai` | Model `gpt-*`, `o1-*`, `o3-*`, `o4-*` |
+| `anthropic` | Model `claude-*`, `sonnet-*`, `opus-*`, campo `anthropic_version` |
+| `google` | Campo `contents` ou `generationConfig` |
+| `gemini` | Model `gemini-*` |
+| `claude_code` | Model `command-*` |
+| `cursor` | Model `cursor-*` |
+| `windsurf` | Model `windsurf-*` |
+| `mistral` | Model `mistral-*` |
+| `cohere` | Model `cohere-*` |
+| `deepseek` | Model `deepseek-*` |
+| `openrouter` | Model `llama-*`, `mixtral-*` |
+
+---
+
+## Configuração de Proxy
+
+O Galileu suporta dois modos de operação:
+
+### Modo Whitelist (Padrão)
+
+Apenas hosts permitidos são analisados:
+
+```yaml
+proxy:
+  mode: whitelist
+  allowed_hosts:
+    - "*.openai.com"
+    - "*.anthropic.com"
+    - "*.generativelanguage.googleapis.com"
+  skip_hosts:
+    - "*.telemetry.*"
+```
+
+### Modo Passivo (Recomendado para Ferramentas de AI)
+
+Todos os hosts são analisados, exceto os de telemetry/analytics:
+
+```yaml
+proxy:
+  mode: passive
+  skip_hosts:
+    - "*.telemetry.*"
+    - "*.analytics.*"
+```
+
+### Wildcard Matching
+
+O Galileu suporta wildcards em hosts:
+
+| Padrão | Casa Com |
+|---|---|
+| `*.openai.com` | `api.openai.com`, `chat.openai.com` |
+| `*.telemetry.*` | `events.telemetry.example.com`, `telemetry.opencode.ai` |
+| `*.analytics.*` | `events.analytics.azure.com` |
+
+---
+
+## Hosts Monitorizados por Padrão
+
+No modo whitelist, o Galileu intercepta requisições para os seguintes hosts:
 
 | Provedor | Host |
 |---|---|
-| OpenCode | `opencode.ai` |
-| OpenAI | `api.openai.com` |
-| Anthropic | `api.anthropic.com` |
-| Google AI | `generativelanguage.googleapis.com` |
-| Cohere | `api.cohere.ai` |
-| Mistral | `api.mistral.ai` |
+| OpenAI | `*.openai.com` |
+| Anthropic | `*.anthropic.com` |
+| Google AI | `*.generativelanguage.googleapis.com`, `*.aistudio.googleapis.com` |
+| Cohere | `*.cohere.ai` |
+| Mistral | `*.mistral.ai` |
+| OpenCode | `*.opencode.ai` |
+
+### Hosts Ignorados por Padrão (Telemetry)
+
+| Host | Motivo |
+|---|---|
+| `mobile.events.data.microsoft.com` | Microsoft telemetry |
+| `telemetry.opencode.ai` | OpenCode telemetry |
+| `claude.telemetry.anthropic.com` | Claude Code telemetry |
+| `cursor.telemetry` | Cursor telemetry |
+| `windsurf.telemetry` | Windsurf telemetry |
+| `*.telemetry.*` | Qualquer subdomain de telemetry |
+| `*.analytics.*` | Qualquer subdomain de analytics |
 
 ---
 
@@ -540,11 +691,13 @@ Casos testados que NÃO foram detectados:
 O ficheiro `galileu_audit.log` é criado automaticamente ao finalizar a primeira execução e contém um registro JSON detalhado de cada requisição interceptada:
 
 - **Identificação**: Timestamp, Request ID, Session ID, Machine ID
-- **Requisição**: Host, Provider, Path, Method, Modelo de LLM
+- **Requisição**: Host, Provider (inferido do payload), Path, Method, Modelo de LLM
 - **Detecção**: Padrões detectados, contagem, posições de redação
 - **Payload**: Contagem de mensagens, presença de system prompt, streaming
 - **Performance**: Latência do proxy, duração da análise
 - **Resposta**: Status code, tamanhos de request/response
+
+Requests ignorados (telemetry, analytics) são logados com `provider: "skipped"`.
 
 Consulte o ficheiro [markdown/SCHEMA_AUDITORIA.md](markdown/SCHEMA_AUDITORIA.md) para o schema completo dos campos de auditoria.
 
@@ -558,6 +711,16 @@ O ficheiro `galileu.yml` é **opcional** e deve ser colocado no diretório onde 
 
 ```yaml
 port: 9000
+
+# Configuração do Proxy (opcional)
+proxy:
+  mode: whitelist          # whitelist | passive
+  allowed_hosts:           # usado apenas no modo whitelist
+    - "*.openai.com"
+    - "*.anthropic.com"
+  skip_hosts:              # hosts sempre ignorados
+    - "*.telemetry.*"
+    - "*.analytics.*"
 
 analyzer:
 
@@ -573,19 +736,27 @@ analyzer:
     aws_key:            true
 
   # ─── Padrões personalizados ─────────────────────────────────
-  # Para ativar, mude enabled: false para enabled: true
   custom_patterns:
     # ...
 ```
 
-### Campos Obrigatórios
+### Modos de Operação
 
-| Campo | Tipo | Descrição |
+| Modo | Descrição | Uso Recomendado |
 |---|---|---|
-| `port` | integer | Porta de execução do proxy (padrão: 9000) |
-| `analyzer` | object | Raiz da configuração do analyzer |
-| `built_in` | object | Padrões embutidos e seus estados |
-| `custom_patterns` | array | Lista de padrões personalizados |
+| `whitelist` | Apenas hosts permitidos são analisados | Quando sabe exatamente quais APIs usar |
+| `passive` | Todos os hosts são analisados (exceto skip_hosts) | Claude Code, Cursor, Windsurf, ferramentas que usam múltiplas APIs |
+
+### Configuração para Claude Code / Cursor / Windsurf
+
+```yaml
+proxy:
+  mode: passive
+  skip_hosts:
+    - "*.telemetry.*"
+    - "*.analytics.*"
+    - "mobile.events.data.microsoft.com"
+```
 
 ### Porta de Execução
 
@@ -595,7 +766,7 @@ port: 9000
 
 Você pode escolher qualquer porta disponível. O padrão é `9000`.
 
-> **Nota:** Lembre-se de apontar a sua ferramenta de IA para a mesma porta definida aqui.
+> **Nota:** Lembre-se de apontar a sua ferramenta de AI para a mesma porta definida aqui.
 
 ### Padrões Customizados
 
@@ -650,41 +821,36 @@ custom_patterns:
 
 ## Testes
 
-Verifique pessoalmente a confiabilidade e performance do analyzer:
-
-### Testes Built-in
+Execute todos os testes com:
 
 ```bash
-# Todos os testes do analyzer
-go test -v -run "TestAnalyzer" ./internal/guardian/...
-
-# True positives
-go test -v -run "TestAnalyzerTruePositives" ./internal/guardian/...
-
-# False positives
-go test -v -run "TestAnalyzerNoFalsePositives" ./internal/guardian/...
+make test
 ```
 
-### Testes de Padrões Customizados
+### Testes Específicos
 
 ```bash
-# Regex customizado
-go test -v -run "TestAnalyzerCustomPatternsRegex" ./internal/guardian/...
+# Testes do analyzer
+make test
 
-# Literal customizado
-go test -v -run "TestAnalyzerCustomPatternsLiteral" ./internal/guardian/...
+# Benchmarks de performance
+make benchmarks
 
-# False positives customizados
-go test -v -run "TestAnalyzerCustomPatternsNoFalsePositives" ./internal/guardian/...
+# Relatório de cobertura
+make test-coverage
 ```
 
-### Benchmarks e Performance
+### Testes de Detecção de AI
 
 ```bash
-go test -bench=. -benchmem ./internal/guardian/...
-go test -v -run "TestAnalyzerLatency|TestAnalyzerThroughput" ./internal/guardian/...
+# Testes de filtro e detecção
+go test -v -run "TestShouldProcessRequest|TestIsAIRequest|TestMatchWildcard" ./internal/guardian/...
+
+# Testes de provider inference
+go test -v -run "TestInferFromPayload" ./internal/guardian/...
 ```
-Consulte o ficheiro [markdown/tests.md](markdown/tests.md) para mais informações sobre a execução dos testes
+
+Consulte o ficheiro [markdown/tests.md](markdown/tests.md) para mais informações sobre a execução dos testes.
 
 ---
 
@@ -698,6 +864,9 @@ Execute o `galileu.exe` como Administrador (clique direito → "Executar como ad
 
 **Linux: Erro de certificado SSL/TLS**
 Certifique-se de que instalou o certificado conforme as instruções na secção "Configuração do Certificado CA".
+
+**Claude Code / Cursor não funciona com proxy**
+Configure o proxy no modo `passive` e adicione hosts de telemetry aos `skip_hosts`. Veja a seção "Configuração (galileu.yml)".
 
 ---
 
@@ -735,12 +904,16 @@ Consulte o ficheiro [SECURITY.md](SECURITY.md) para obter informações acerca d
 
 ## Roadmap
 
-| Ordem | Feature | Descrição |
+| Status | Feature | Descrição |
 |---|---|---|
-| 1 | **Integração com Gemini CLI + Claude Code** | Suporte nativo para interceptação e governança de tráfego |
-| 2 | **Integração com GitHub Copilot (VSCode)** | Sanitização de requisições dentro do Visual Studio Code |
-| 3 | **TUI (Terminal User Interface)** | Interface interativa para configuração e monitorização em tempo real |
-| 4 | **Instalação via Homebrew** | `brew install galileu` |
+| ✅ | **Suporte a múltiplas ferramentas** | Galileo agora é agnóstico a ferramentas de AI |
+| ✅ | **Detecção automática via payload** | Detecta requisições de AI pela análise do JSON |
+| ✅ | **Provider inference** | Provider inferido do payload automaticamente |
+| ✅ | **Wildcard matching** | Suporte a `*.openai.com`, `*.telemetry.*` |
+| ✅ | **Modo passive** | Para usar com Claude Code, Cursor, Windsurf |
+| 🔄 | **TUI (Terminal User Interface)** | Interface interativa para configuração e monitorização em tempo real |
+| 🔜 | **Instalação via Homebrew** | `brew install galileu` |
+| 🔜 | **Plugin system** | Sistema de plugins para padrões customizados |
 
 ---
 

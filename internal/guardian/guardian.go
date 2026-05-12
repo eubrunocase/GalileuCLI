@@ -136,98 +136,99 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 	logWorkerPool.Start()
 	defer logWorkerPool.Shutdown()
 
-	targetHosts := []string{
-		"opencode.ai",
-		"api.openai.com",
-		"api.anthropic.com",
-		"generativelanguage.googleapis.com",
-		"aistudio.googleapis.com",
-		"api.cohere.ai",
-		"api.mistral.ai",
-	}
+	proxy.OnRequest().DoFunc(
+		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+			if r.Method == "CONNECT" {
+				return r, nil
+			}
 
-	for _, host := range targetHosts {
-		h := host
-		proxy.OnRequest(goproxy.DstHostIs(h)).DoFunc(
-			func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-				if r.Body == nil || r.Body == http.NoBody || r.Method != "POST" {
-					return r, nil
-				}
+			startTime := time.Now()
+			contentType := r.Header.Get("Content-Type")
 
-				startTime := time.Now()
+			var bodyBytes []byte
+			if r.Body != nil && r.Body != http.NoBody {
+				bodyBytes, _ = io.ReadAll(io.LimitReader(r.Body, MaxBodySize))
+				r.Body.Close()
+			}
 
-				bodyBytes, err := io.ReadAll(r.Body)
-				if err != nil {
-					logWorkerPool.Submit(LogRequest{
-						RequestID:      generateUUID(),
-						Host:           r.Host,
-						Provider:       inferProvider(r.Host),
-						Path:           r.URL.Path,
-						Method:         r.Method,
-						ProxyError:     true,
-						ErrorMessage:   fmt.Sprintf("Failed to read body: %v", err),
-						ProxyLatencyMs: int(time.Since(startTime).Milliseconds()),
-					})
-					return r, nil
-				}
+			shouldProcess, pi := ShouldProcessRequest(r.Host, r.Method, contentType, bodyBytes)
 
-				analysisStart := time.Now()
-				result := analyzer.Analyze(bodyBytes)
-				analysisDurationMs := int(time.Since(analysisStart).Milliseconds())
-
-				host := r.Host
-				path := r.URL.Path
-				method := r.Method
-				provider := inferProvider(host)
-
-				payloadInfo := extractPayloadInfo(bodyBytes)
+			if !shouldProcess {
+				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+				r.ContentLength = int64(len(bodyBytes))
 
 				logWorkerPool.Submit(LogRequest{
-					RequestID: generateUUID(),
-					Host:      host,
-					Provider:  provider,
-					Path:      path,
-					Method:    method,
-					Model:     payloadInfo.model,
-
-					Redacted:           result.Modified,
-					PatternCount:       result.PatternCount,
-					DetectedPatterns:   result.DetectedPatterns,
-					RedactionPositions: result.RedactionPositions,
-
-					MessageCount:    payloadInfo.messageCount,
-					HasSystemPrompt: payloadInfo.hasSystemPrompt,
-					Stream:          payloadInfo.stream,
-
-					RequestBodySizeBytes:  len(bodyBytes),
-					ResponseBodySizeBytes: 0,
-
-					ProxyLatencyMs:     int(time.Since(startTime).Milliseconds()),
-					AnalysisDurationMs: analysisDurationMs,
+					RequestID:      generateUUID(),
+					Host:           r.Host,
+					Provider:       "skipped",
+					Path:           r.URL.Path,
+					Method:         r.Method,
+					ProxyLatencyMs: int(time.Since(startTime).Milliseconds()),
 				})
 
-				if result.Modified {
-					if analyzer.DryRun {
-						fmt.Printf("[GALILEU] [DRY-RUN] Detectado em %s: %d dado(s) sensivel(is) - NAO modificado.\n", r.Host, result.PatternCount)
-						fmt.Printf("[GALILEU]         Padroes: %v\n", result.DetectedPatterns)
-					} else {
-						fmt.Printf("[GALILEU] Interceptado em %s: %d dado(s) sensivel(is) removido(s).\n", r.Host, result.PatternCount)
-					}
-					r.Body = io.NopCloser(bytes.NewReader(result.Result))
-					r.ContentLength = int64(len(result.Result))
-					r.Header.Set("Content-Length", fmt.Sprintf("%d", len(result.Result)))
-					if r.Header.Get("Transfer-Encoding") != "" {
-						r.Header.Del("Transfer-Encoding")
-					}
-				} else {
-					r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-					r.ContentLength = int64(len(bodyBytes))
-				}
-
 				return r, nil
-			},
-		)
-	}
+			}
+
+			providerInfo := InferFromPayload(bodyBytes)
+			provider := providerInfo.Provider
+			if provider == "unknown" {
+				provider = inferProvider(r.Host)
+			}
+
+			analysisStart := time.Now()
+			result := analyzer.Analyze(bodyBytes)
+			analysisDurationMs := int(time.Since(analysisStart).Milliseconds())
+
+			model := pi.model
+			if model == "" {
+				model = providerInfo.Model
+			}
+
+			logWorkerPool.Submit(LogRequest{
+				RequestID: generateUUID(),
+				Host:      r.Host,
+				Provider:  provider,
+				Path:      r.URL.Path,
+				Method:    r.Method,
+				Model:     model,
+
+				Redacted:           result.Modified,
+				PatternCount:       result.PatternCount,
+				DetectedPatterns:   result.DetectedPatterns,
+				RedactionPositions: result.RedactionPositions,
+
+				MessageCount:    pi.messageCount,
+				HasSystemPrompt: pi.hasSystemPrompt,
+				Stream:          pi.stream,
+
+				RequestBodySizeBytes:  len(bodyBytes),
+				ResponseBodySizeBytes: 0,
+
+				ProxyLatencyMs:     int(time.Since(startTime).Milliseconds()),
+				AnalysisDurationMs: analysisDurationMs,
+			})
+
+			if result.Modified {
+				if analyzer.DryRun {
+					fmt.Printf("[GALILEU] [DRY-RUN] Detectado em %s: %d dado(s) sensivel(is) - NAO modificado.\n", r.Host, result.PatternCount)
+					fmt.Printf("[GALILEU]         Padroes: %v\n", result.DetectedPatterns)
+				} else {
+					fmt.Printf("[GALILEU] Interceptado em %s: %d dado(s) sensivel(is) removido(s).\n", r.Host, result.PatternCount)
+				}
+				r.Body = io.NopCloser(bytes.NewReader(result.Result))
+				r.ContentLength = int64(len(result.Result))
+				r.Header.Set("Content-Length", fmt.Sprintf("%d", len(result.Result)))
+				if r.Header.Get("Transfer-Encoding") != "" {
+					r.Header.Del("Transfer-Encoding")
+				}
+			} else {
+				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+				r.ContentLength = int64(len(bodyBytes))
+			}
+
+			return r, nil
+		},
+	)
 
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		if resp != nil && resp.StatusCode >= 500 {
@@ -236,9 +237,8 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 		return resp
 	})
 
-	// ✅ CORREÇÃO: Adicionar handler para erros de conexão usando ConnectionErrHandler
 	proxy.ConnectionErrHandler = func(conn io.Writer, ctx *goproxy.ProxyCtx, err error) {
-		fmt.Printf("[GALILEU] ❌ ERRO DE CONEXÃO: %v\n[GALILEU] Host: %s | Path: %s | Method: %s\n",
+		fmt.Printf("[GALILEU] ERRO DE CONEXAO: %v\n[GALILEU] Host: %s | Path: %s | Method: %s\n",
 			err, ctx.Req.Host, ctx.Req.URL.Path, ctx.Req.Method)
 
 		logWorkerPool.Submit(LogRequest{
@@ -261,16 +261,9 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 		io.WriteString(conn, errorResponse)
 	}
 
-	proxy.OnRequest().DoFunc(
-		func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-			return r, nil
-		},
-	)
-
 	fmt.Println("[GALILEU] Proxy MITM Ativo na porta " + fmt.Sprintf(":%d", port) + "...")
 	shutdownChan = make(chan struct{})
 
-	// ✅ CORREÇÃO: Adicionar timeouts ao servidor HTTP
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      proxy,
@@ -405,7 +398,12 @@ func extractPayloadInfo(body []byte) payloadInfo {
 
 	if genConfig, ok := data["generationConfig"].(map[string]interface{}); ok {
 		if _, ok := genConfig["stopSequences"]; ok {
-			// Gemini-specific config detected
+		}
+	}
+
+	if !info.hasSystemPrompt {
+		if systemInstruction, ok := data["system_instruction"]; ok && systemInstruction != nil {
+			info.hasSystemPrompt = true
 		}
 	}
 

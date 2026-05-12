@@ -11,7 +11,7 @@
 ### Compilar Versão Corrigida
 ```powershell
 cd "c:\Desenvolvimento\galileulinux\src\galileu-unified"
-go build -o galileu.exe ./cmd/sentinel
+go build -o galileu.exe ./cmd/galileu
 ```
 
 **Validar**: Arquivo `galileu.exe` deve ser criado (~15-20 MB)
@@ -340,7 +340,7 @@ go env
 ### Passo 5: Recompilar e Testar
 ```powershell
 go clean -cache
-go build -o galileu.exe ./cmd/sentinel
+go build -o galileu.exe ./cmd/galileu
 ```
 
 ---

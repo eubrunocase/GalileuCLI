@@ -91,7 +91,7 @@ func runDoctor() {
 		os.Exit(1)
 	}
 
-	fmt.Println("=== Diagnostico do Galileu ===\n")
+	fmt.Println("=== Diagnostico do Galileu ===")
 
 	fmt.Printf("Certificado CA:      ")
 	if result.CertificateInstalled {

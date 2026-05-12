@@ -36,7 +36,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.21'
 
       - name: Build
         env:
@@ -46,7 +46,7 @@ jobs:
         run: |
           go build -ldflags="-s -w" \
             -o ${{ matrix.artifact }} \
-            ./cmd/sentinel
+            ./cmd/galileu
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -78,9 +78,44 @@ jobs:
           body: |
             ## Galileu ${{ github.ref_name }}
 
-            Versão oficial do GalileuCLI
+            Proxy de Segurança e Governança para Ferramentas de AI.
 
-            ## Checksums SHA256
+            ### Novidades desta Versão
+
+            - **Suporte a Múltiplas Ferramentas**: Compatível com OpenCode, Claude Code, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Codex e qualquer ferramenta que suporte proxy customizado
+            - **Detecção Automática**: Identifica requisições de AI automaticamente através da análise do payload JSON
+            - **Provider Inference**: Provider é inferido automaticamente do payload (não depende do host)
+            - **Modo Passive**: Novo modo de operação para ferramentas que usam múltiplas APIs
+            - **Wildcard Matching**: Suporte a padrões como `*.openai.com`, `*.telemetry.*`
+
+            ### Como Usar
+
+            **Modo Whitelist (padrão):**
+            ```yaml
+            proxy:
+              mode: whitelist
+              allowed_hosts:
+                - "*.openai.com"
+                - "*.anthropic.com"
+            ```
+
+            **Modo Passive (Claude Code, Cursor, Windsurf):**
+            ```yaml
+            proxy:
+              mode: passive
+              skip_hosts:
+                - "*.telemetry.*"
+                - "*.analytics.*"
+            ```
+
+            ### Detecção de Dados Sensíveis
+
+            Sanitiza automaticamente:
+            - API Keys (OpenAI, Anthropic, Google, GitHub)
+            - Tokens (Slack, Discord, AWS)
+            - Credenciais personalizadas via regex/literal
+
+            ### Verificação de Integridade
 
             Execute o comando abaixo para verificar:
 
@@ -95,7 +130,7 @@ jobs:
             ```
 
             O arquivo checksums.txt está anexado nesta release.
-            
+
           files: |
             dist/*
           draft: false

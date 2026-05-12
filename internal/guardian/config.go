@@ -12,7 +12,14 @@ import (
 
 type GalileuConfig struct {
 	Port     int            `yaml:"port"`
+	Proxy    ProxySection   `yaml:"proxy"`
 	Analyzer AnalyzerConfig `yaml:"analyzer"`
+}
+
+type ProxySection struct {
+	Mode         string   `yaml:"mode"`
+	AllowedHosts []string `yaml:"allowed_hosts"`
+	SkipHosts    []string `yaml:"skip_hosts"`
 }
 
 type AnalyzerConfig struct {
@@ -171,8 +178,29 @@ func LoadConfig(path string) (int, []CompiledPattern, error) {
 		port = 9000
 	}
 
+	loadProxyConfig(cfg.Proxy)
+
 	fmt.Printf("[Galileu] %d padrão(ões) de detecção carregado(s) a partir de '%s'.\n", len(compiled), path)
 	return port, compiled, nil
+}
+
+func loadProxyConfig(proxyCfg ProxySection) {
+	if proxyCfg.Mode != "" {
+		GlobalProxyConfig.Mode = proxyCfg.Mode
+	} else {
+		GlobalProxyConfig.Mode = "whitelist"
+	}
+
+	if len(proxyCfg.AllowedHosts) > 0 {
+		GlobalProxyConfig.AllowedHosts = proxyCfg.AllowedHosts
+	}
+
+	if len(proxyCfg.SkipHosts) > 0 {
+		GlobalProxyConfig.SkipHosts = proxyCfg.SkipHosts
+	}
+
+	fmt.Printf("[Galileu] Modo proxy: %s (hosts permitidos: %d, hosts ignorados: %d)\n",
+		GlobalProxyConfig.Mode, len(GlobalProxyConfig.AllowedHosts), len(GlobalProxyConfig.SkipHosts))
 }
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
@@ -201,5 +229,43 @@ func defaultBuiltInConfig() BuiltInConfig {
 		SlackToken:    true,
 		DiscordToken:  true,
 		AWSKey:        true,
+	}
+}
+
+type ProxyConfig struct {
+	Mode         string
+	AllowedHosts []string
+	SkipHosts    []string
+}
+
+var GlobalProxyConfig = ProxyConfig{
+	Mode:         "whitelist",
+	AllowedHosts: defaultAllowedHosts(),
+	SkipHosts:    defaultSkipHosts(),
+}
+
+func defaultAllowedHosts() []string {
+	return []string{
+		"*.openai.com",
+		"*.anthropic.com",
+		"*.generativelanguage.googleapis.com",
+		"*.aistudio.googleapis.com",
+		"*.cohere.ai",
+		"*.mistral.ai",
+		"*.opencode.ai",
+	}
+}
+
+func defaultSkipHosts() []string {
+	return []string{
+		"mobile.events.data.microsoft.com",
+		"telemetry.opencode.ai",
+		"claude.telemetry.anthropic.com",
+		"cursor.telemetry",
+		"windsurf.telemetry",
+		"*.telemetry.*",
+		"*.analytics.*",
+		"vscode-clientanalytics.azurewebsites.net",
+		"dc.services.visualstudio.com",
 	}
 }

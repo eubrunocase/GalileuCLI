@@ -1,15 +1,54 @@
 # ═════════════════════════════════════════════════════════════════════════════
-# galileu.yml — Configuração do Analyzer de Dados Sensíveis
+# galileu.yml — Configuração do Proxy de Segurança para Ferramentas de AI
 #
 # Este ficheiro controla o comportamento do Galileu.
 # Não é necessário tocar no código Go para alterar os padrões de detecção.
 #
-# TIPOS DE PADRÃO CUSTOM:
-#   type: regex   → O campo 'pattern' aceita uma expressão regular
-#   type: literal → O campo 'values' aceita uma lista de strings exactas
+# MODOS DE OPERAÇÃO DO PROXY:
+#   whitelist → Apenas hosts permitidos são analisados (padrão, retrocompatível)
+#   passive   → Todos os hosts são analisados (exceto skip_hosts)
+#
+# WILDCARDS:
+#   *.openai.com       → Casa com api.openai.com, chat.openai.com, etc.
+#   *.telemetry.*      → Casa com qualquer subdomínio de telemetry
+#
+# DETECÇÃO AUTOMÁTICA:
+#   O Galileu detecta automaticamente requisições de AI pelo payload:
+#   - Campo 'model' presente
+#   - Campo 'messages' (formato OpenAI)
+#   - Campo 'contents' (formato Google Gemini)
+#   - Campo 'anthropic_version' (Anthropic API)
+#   - Campo 'prompt' ou 'input' (outras APIs)
 # ═════════════════════════════════════════════════════════════════════════════
 
-port: 9000 → você pode escolher a porta em que a aplicação irá executar, mas lembre-se de abrir a sua ferramenta apontando para o endereço correto do proxy
+port: 9000
+
+# ─── Configuração do Proxy ───────────────────────────────────────────────
+# Controla quais requisições são analisadas para dados sensíveis
+
+proxy:
+  # Modo de operação: "whitelist" (padrão) ou "passive"
+  mode: whitelist
+
+  # Hosts permitidos (usado apenas no modo whitelist)
+  # Suporta wildcards: *.dominio.com casa com sub.dominio.com
+  allowed_hosts:
+    - "*.openai.com"
+    - "*.anthropic.com"
+    - "*.generativelanguage.googleapis.com"
+    - "*.aistudio.googleapis.com"
+    - "*.cohere.ai"
+    - "*.mistral.ai"
+    - "*.opencode.ai"
+
+  # Hosts sempre ignorados (telemetry, analytics, etc.)
+  # Omitir para aceitar todos exceto os padrões internos
+  skip_hosts:
+    - "mobile.events.data.microsoft.com"
+    - "telemetry.opencode.ai"
+    - "*.telemetry.*"
+    - "*.analytics.*"
+
 analyzer:
 
   # ─── Padrões embutidos ─────────────────────────────────────────────────
@@ -76,3 +115,32 @@ analyzer:
       pattern: '-----BEGIN.*PRIVATE KEY-----'
       label: "[PRIVATE_KEY_REDACTED]"
       enabled: true
+
+# ═════════════════════════════════════════════════════════════════════════════
+# EXEMPLOS DE CONFIGURAÇÃO
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# MODO PASSIVO (para usar com Claude Code, Cursor, Windsurf, etc.):
+#
+# proxy:
+#   mode: passive
+#   skip_hosts:
+#     - "*.telemetry.*"
+#     - "*.analytics.*"
+#
+# MODO WHITELIST COM HOSTS CUSTOMIZADOS:
+#
+# proxy:
+#   mode: whitelist
+#   allowed_hosts:
+#     - "api.openai.com"
+#     - "api.anthropic.com"
+#     - "api.custom-llm.com"
+#   skip_hosts:
+#     - "internal.metrics.company.com"
+#
+# SEM CONFIGURAÇÃO (usa valores padrão, retrocompatível):
+#
+# proxy:
+#   # Omitir seção proxy para usar configuração padrão
+#   # Equivalente a mode: whitelist com os hosts padrão listados acima

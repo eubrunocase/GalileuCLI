@@ -35,3 +35,4 @@ galileu-ca.pem
 
 galileu.yml
 .env.fakeYmlTest
+coverage.out
