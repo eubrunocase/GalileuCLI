@@ -314,9 +314,9 @@ O binário `galileu` suporta os seguintes subcomandos:
 |---------|-----------|
 | `galileu` | Iniciar o proxy |
 | `galileu --dry-run` | Iniciar proxy em modo DRY-RUN (apenas detectar, não modificar) |
-| `galileu doctor` | Executar diagnóstico do sistema |
-| `galileu version` | Mostrar versão do binário |
-| `galileu -h` | Mostrar ajuda |
+| `make doctor` | Executar diagnóstico do sistema |
+| `make version` | Mostrar versão do binário |
+| `make help` | Mostrar ajuda |
 
 ### Modo DRY-RUN
 
