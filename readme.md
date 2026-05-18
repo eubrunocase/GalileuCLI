@@ -906,7 +906,7 @@ Consulte o ficheiro [SECURITY.md](SECURITY.md) para obter informações acerca d
 
 | Status | Feature | Descrição |
 |---|---|---|
-| ✅ | **Suporte a múltiplas ferramentas** | Galileo agora é agnóstico a ferramentas de AI |
+| ✅ | **Suporte a múltiplas ferramentas** | Galileu agora é agnóstico a ferramentas de AI |
 | ✅ | **Detecção automática via payload** | Detecta requisições de AI pela análise do JSON |
 | ✅ | **Provider inference** | Provider inferido do payload automaticamente |
 | ✅ | **Wildcard matching** | Suporte a `*.openai.com`, `*.telemetry.*` |
