@@ -37,4 +37,5 @@ galileu.yml
 .env.fakeYmlTest
 coverage.out
 
-
+.claude/**
+galileu

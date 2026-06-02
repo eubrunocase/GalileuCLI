@@ -113,6 +113,19 @@ func (p *LogWorkerPool) Submit(logReq LogRequest) {
 	}
 }
 
+// submitToUI forwards a LogRequest to the TUI event channel without blocking.
+// events may be nil when running in plain-text mode.
+func submitToUI(events chan<- LogRequest, logReq LogRequest) {
+	if events == nil {
+		return
+	}
+	select {
+	case events <- logReq:
+	default:
+		// Drop silently if the TUI consumer is slow — never stall the proxy.
+	}
+}
+
 func (p *LogWorkerPool) Shutdown() {
 	close(p.logChan)
 	p.wg.Wait()
@@ -123,7 +136,7 @@ var (
 	shutdownChan  chan struct{}
 )
 
-func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) {
+func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int, events chan<- LogRequest) {
 	proxy := goproxy.NewProxyHttpServer()
 
 	setCA(certPEM, keyPEM)
@@ -157,14 +170,16 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 				r.ContentLength = int64(len(bodyBytes))
 
-				logWorkerPool.Submit(LogRequest{
+				skipped := LogRequest{
 					RequestID:      generateUUID(),
 					Host:           r.Host,
 					Provider:       "skipped",
 					Path:           r.URL.Path,
 					Method:         r.Method,
 					ProxyLatencyMs: int(time.Since(startTime).Milliseconds()),
-				})
+				}
+				logWorkerPool.Submit(skipped)
+				submitToUI(events, skipped)
 
 				return r, nil
 			}
@@ -184,7 +199,7 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 				model = providerInfo.Model
 			}
 
-			logWorkerPool.Submit(LogRequest{
+			entry := LogRequest{
 				RequestID: generateUUID(),
 				Host:      r.Host,
 				Provider:  provider,
@@ -206,7 +221,9 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 
 				ProxyLatencyMs:     int(time.Since(startTime).Milliseconds()),
 				AnalysisDurationMs: analysisDurationMs,
-			})
+			}
+			logWorkerPool.Submit(entry)
+			submitToUI(events, entry)
 
 			if result.Modified {
 				if analyzer.DryRun {
@@ -241,7 +258,7 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 		fmt.Printf("[GALILEU] ERRO DE CONEXAO: %v\n[GALILEU] Host: %s | Path: %s | Method: %s\n",
 			err, ctx.Req.Host, ctx.Req.URL.Path, ctx.Req.Method)
 
-		logWorkerPool.Submit(LogRequest{
+		connErr := LogRequest{
 			RequestID:    generateUUID(),
 			Host:         ctx.Req.Host,
 			Provider:     inferProvider(ctx.Req.Host),
@@ -249,7 +266,9 @@ func GracefulListenWithCA(certPEM, keyPEM []byte, analyzer *Analyzer, port int) 
 			Method:       ctx.Req.Method,
 			ProxyError:   true,
 			ErrorMessage: fmt.Sprintf("Connection error: %v", err),
-		})
+		}
+		logWorkerPool.Submit(connErr)
+		submitToUI(events, connErr)
 
 		errorResponse := fmt.Sprintf(
 			"HTTP/1.1 502 Bad Gateway\r\n"+

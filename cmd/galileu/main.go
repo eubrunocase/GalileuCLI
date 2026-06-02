@@ -9,6 +9,9 @@ import (
 	"Galileu/internal/ca"
 	"Galileu/internal/doctor"
 	"Galileu/internal/guardian"
+	"Galileu/internal/tui"
+
+	"github.com/charmbracelet/x/term"
 )
 
 const version = "1.0.0"
@@ -128,8 +131,6 @@ func runDoctor() {
 }
 
 func runProxy(dryRun bool) {
-	printBanner()
-
 	certPath, keyPath := ca.ResolvePaths(ca.CertFile, ca.KeyFile)
 
 	certPEM, keyPEM, err := ca.EnsureCA(certPath, keyPath)
@@ -150,6 +151,44 @@ func runProxy(dryRun bool) {
 	analyzer := guardian.NewAnalyzer(patterns)
 	analyzer.DryRun = dryRun
 
+	isTTY := term.IsTerminal(os.Stdout.Fd())
+
+	if isTTY {
+		runProxyWithTUI(certPEM, keyPEM, analyzer, port, dryRun)
+	} else {
+		runProxyPlain(certPEM, keyPEM, analyzer, port, dryRun)
+	}
+}
+
+// runProxyWithTUI starts the proxy and drives the interactive TUI.
+func runProxyWithTUI(certPEM, keyPEM []byte, analyzer *guardian.Analyzer, port int, dryRun bool) {
+	// Buffered channel: proxy goroutine never blocks on a slow TUI render.
+	events := make(chan guardian.LogRequest, 128)
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go guardian.GracefulListenWithCA(certPEM, keyPEM, analyzer, port, events)
+
+	// Watch for OS signals and close the events channel to shut down the TUI.
+	go func() {
+		<-quit
+		guardian.CloseGuardian()
+		close(events)
+	}()
+
+	if err := tui.Run(events, port, dryRun); err != nil {
+		fmt.Fprintf(os.Stderr, "[ERRO] TUI: %v\n", err)
+	}
+
+	guardian.CloseAuditLogger()
+	fmt.Println("[GALILEU] Log de auditoria persistido com sucesso.")
+}
+
+// runProxyPlain is the original plain-text mode used when stdout is not a TTY.
+func runProxyPlain(certPEM, keyPEM []byte, analyzer *guardian.Analyzer, port int, dryRun bool) {
+	printBanner()
+
 	if dryRun {
 		fmt.Println("[GALILEU] Modo DRY-RUN ativo - apenas detectando, sem modificar payloads.")
 	}
@@ -157,7 +196,7 @@ func runProxy(dryRun bool) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	go guardian.GracefulListenWithCA(certPEM, keyPEM, analyzer, port)
+	go guardian.GracefulListenWithCA(certPEM, keyPEM, analyzer, port, nil)
 
 	fmt.Println("[GALILEU] Proxy ativo na porta" + fmt.Sprintf(":%d", port) + ". Aguardando requisições...")
 	fmt.Println("[GALILEU] Pressione Ctrl+C para encerrar e persistir o log de auditoria.")
