@@ -88,56 +88,96 @@ jobs:
 
             Proxy de Segurança e Governança para Ferramentas de AI.
 
-            ### Novidades desta Versão
+            ---
 
-            - **Suporte a Múltiplas Ferramentas**: Compatível com OpenCode, Claude Code, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Codex e qualquer ferramenta que suporte proxy customizado
-            - **Detecção Automática**: Identifica requisições de AI automaticamente através da análise do payload JSON
-            - **Provider Inference**: Provider é inferido automaticamente do payload (não depende do host)
-            - **Modo Passive**: Novo modo de operação para ferramentas que usam múltiplas APIs
-            - **Wildcard Matching**: Suporte a padrões como `*.openai.com`, `*.telemetry.*`
+            ### O que há de novo
 
-            ### Como Usar
+            #### Interface de Linha de Comando (CLI)
 
-            **Modo Whitelist (padrão):**
-            ```yaml
-            proxy:
-              mode: whitelist
-              allowed_hosts:
-                - "*.openai.com"
-                - "*.anthropic.com"
+            O Galileu agora possui uma CLI estruturada com subcomandos explícitos:
+
+            ```
+            galileu start              # inicia o proxy (modo padrão)
+            galileu start --dry-run    # inicia em modo observação, sem bloquear nem sanitizar
+            galileu doctor             # diagnóstico do ambiente (CA, certificados, variáveis)
+            galileu install-ca         # instala o certificado CA no sistema
+            galileu version            # exibe a versão atual
             ```
 
-            **Modo Passive (Claude Code, Cursor, Windsurf):**
-            ```yaml
-            proxy:
-              mode: passive
-              skip_hosts:
-                - "*.telemetry.*"
-                - "*.analytics.*"
+            O proxy detecta automaticamente se está rodando em um terminal interativo (TTY). Em modo TTY, a TUI é inicializada; em modo não-TTY (CI, pipe, scripts), o modo texto puro é usado — sem nenhuma configuração adicional.
+
+            ---
+
+            #### TUI Interativa com Edição do `galileu.yml`
+
+            A interface interativa foi expandida com três telas navegáveis pelo teclado:
+
+            **Dashboard** — visão em tempo real das requisições interceptadas pelo proxy:
+            - Lista de requisições com provider, host, status (allowed/blocked/sanitized) e timestamp
+            - Contador de totais por categoria
+            - Log de auditoria persistido automaticamente ao encerrar
+
+            **Padrões de Detecção** (`P`) — gerenciamento completo dos padrões de sanitização diretamente pela TUI:
+            - Visualização dos built-ins agrupados por categoria (OpenAI, Anthropic, AWS, GitHub, Google, Slack, Discord, genérico)
+            - Toggle de ativação/desativação de cada built-in sem editar o arquivo manualmente
+            - Criação, edição e remoção de padrões customizados (tipo `regex` ou `literal`)
+            - Validação de regex em tempo real enquanto o usuário digita
+            - Persistência imediata no `galileu.yml` ao salvar
+
+            **Configuração do Proxy** (`X`) — edição das configurações do proxy pela TUI:
+            - Alteração da porta de escuta
+            - Alternância entre modos `whitelist` e `passive`
+            - Gerenciamento de `allowed_hosts` (whitelist) e `skip_hosts` (passive) com add/remove inline
+            - Persistência imediata no `galileu.yml` ao salvar
+
+            **Primeira execução:** se o `galileu.yml` não existir, a TUI carrega os valores padrão e cria o arquivo automaticamente na primeira vez que o usuário salvar qualquer configuração.
+
+            ---
+
+            #### Script de Instalação para Windows (PowerShell)
+
+            Adicionado `install-galileu.ps1` para instalação automatizada no Windows:
+            - Download do binário correto para a arquitetura do sistema
+            - Instalação do certificado CA no repositório de certificados do Windows
+            - Configuração automática das variáveis de ambiente `HTTP_PROXY` e `HTTPS_PROXY`
+            - Verificação de integridade via SHA-256
+
+            ---
+
+            ### Instalação
+
+            **Linux / macOS:**
+            ```bash
+            # Baixe o binário para sua plataforma
+            curl -LO https://github.com/brunoCase/GalileuCLI/releases/download/${{ github.ref_name }}/galileu-linux-amd64
+            # ou: galileu-darwin-arm64 / galileu-darwin-amd64
+
+            chmod +x galileu-linux-amd64
+            sudo mv galileu-linux-amd64 /usr/local/bin/galileu
+
+            # Instale o certificado CA e inicie
+            galileu install-ca
+            galileu start
             ```
 
-            ### Detecção de Dados Sensíveis
+            **Windows (PowerShell como Administrador):**
+            ```powershell
+            irm https://raw.githubusercontent.com/brunoCase/GalileuCLI/main/install-galileu.ps1 | iex
+            ```
 
-            Sanitiza automaticamente:
-            - API Keys (OpenAI, Anthropic, Google, GitHub)
-            - Tokens (Slack, Discord, AWS)
-            - Credenciais personalizadas via regex/literal
+            ---
 
             ### Verificação de Integridade
 
-            Execute o comando abaixo para verificar:
-
-            Linux/macOS:
             ```bash
+            # Linux / macOS
             sha256sum -c checksums.txt
-            ```
 
-            Windows (PowerShell):
-            ```powershell
+            # Windows (PowerShell)
             Get-FileHash galileu-windows-amd64.exe -Algorithm SHA256
             ```
 
-            O arquivo checksums.txt está anexado nesta release.
+            O arquivo `checksums.txt` com os hashes SHA-256 de todos os binários está anexado a esta release.
 
           files: |
             dist/*
