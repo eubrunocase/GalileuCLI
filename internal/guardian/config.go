@@ -203,6 +203,60 @@ func loadProxyConfig(proxyCfg ProxySection) {
 		GlobalProxyConfig.Mode, len(GlobalProxyConfig.AllowedHosts), len(GlobalProxyConfig.SkipHosts))
 }
 
+// ─── LoadRawConfig / SaveConfig (usados pela TUI) ────────────────────────────
+
+// LoadRawConfig reads and unmarshals galileu.yml without compiling patterns.
+// Returns default values when the file does not exist.
+func LoadRawConfig(path string) (GalileuConfig, error) {
+	var cfg GalileuConfig
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return defaultGalileuConfig(), nil
+		}
+		return cfg, fmt.Errorf("erro ao ler galileu.yml: %w", err)
+	}
+
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return cfg, fmt.Errorf("erro ao fazer parse do galileu.yml: %w", err)
+	}
+
+	if cfg.Port == 0 {
+		cfg.Port = 9000
+	}
+
+	return cfg, nil
+}
+
+// SaveConfig serialises cfg to YAML and writes it to path.
+func SaveConfig(path string, cfg GalileuConfig) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("erro ao serializar configuração: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("erro ao escrever galileu.yml: %w", err)
+	}
+
+	return nil
+}
+
+func defaultGalileuConfig() GalileuConfig {
+	return GalileuConfig{
+		Port: 9000,
+		Proxy: ProxySection{
+			Mode:         "whitelist",
+			AllowedHosts: defaultAllowedHosts(),
+			SkipHosts:    defaultSkipHosts(),
+		},
+		Analyzer: AnalyzerConfig{
+			BuiltIn: defaultBuiltInConfig(),
+		},
+	}
+}
+
 // ─── Helpers internos ─────────────────────────────────────────────────────────
 
 func compileBuiltIns(cfg BuiltInConfig) []CompiledPattern {

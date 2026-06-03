@@ -10,21 +10,21 @@ import (
 	"Galileu/internal/doctor"
 	"Galileu/internal/guardian"
 	"Galileu/internal/tui"
-
-	"github.com/charmbracelet/x/term"
 )
 
-const version = "1.0.0"
+const version = "2.0.0"
 
 func main() {
 	args := os.Args[1:]
 
 	dryRun := containsArg(args, "--dry-run")
+	useTUI := containsArg(args, "--tui")
 
-	filteredArgs := filterArgs(args, "--dry-run")
+	// Strip known flags before sub-command parsing.
+	filteredArgs := filterArgs(args, "--dry-run", "--tui")
 
 	if len(filteredArgs) == 0 {
-		runProxy(dryRun)
+		runProxy(dryRun, useTUI)
 		return
 	}
 
@@ -34,7 +34,7 @@ func main() {
 	case "version", "--version", "-v":
 		runVersion()
 	case "start":
-		runProxy(dryRun)
+		runProxy(dryRun, useTUI)
 	case "-h", "--help", "help":
 		printHelp()
 	default:
@@ -44,10 +44,14 @@ func main() {
 	}
 }
 
-func filterArgs(args []string, exclude string) []string {
-	result := make([]string, 0)
+func filterArgs(args []string, exclude ...string) []string {
+	excluded := make(map[string]bool, len(exclude))
+	for _, e := range exclude {
+		excluded[e] = true
+	}
+	result := make([]string, 0, len(args))
 	for _, a := range args {
-		if a != exclude {
+		if !excluded[a] {
 			result = append(result, a)
 		}
 	}
@@ -63,22 +67,20 @@ func containsArg(args []string, arg string) bool {
 	return false
 }
 
-func startsWithDash(s string) bool {
-	return len(s) > 0 && s[0] == '-'
-}
-
 func printHelp() {
 	fmt.Println(`Galileu - Proxy de Segurança para LLMs
 
 Uso:
-  galileu               Iniciar o proxy
+  galileu               Iniciar o proxy (modo headless)
+  galileu --tui         Iniciar o proxy com interface interactiva
   galileu --dry-run     Iniciar proxy em modo DRY-RUN (apenas detectar, não modificar)
   galileu doctor        Executar diagnóstico do sistema
   galileu version       Mostrar versão do binário
 
 Exemplos:
   galileu               Inicia o proxy na porta 9000
-  galileu --dry-run     Inicia proxy em modo teste (mostra o que seria redatado)
+  galileu --tui         Inicia proxy com TUI interactiva
+  galileu --dry-run     Inicia proxy em modo teste
   galileu doctor        Verifica certificado, porta e variáveis
   galileu -h            Mostra esta ajuda`)
 }
@@ -130,7 +132,7 @@ func runDoctor() {
 	fmt.Println("Tudo OK!")
 }
 
-func runProxy(dryRun bool) {
+func runProxy(dryRun, withTUI bool) {
 	certPath, keyPath := ca.ResolvePaths(ca.CertFile, ca.KeyFile)
 
 	certPEM, keyPEM, err := ca.EnsureCA(certPath, keyPath)
@@ -151,9 +153,7 @@ func runProxy(dryRun bool) {
 	analyzer := guardian.NewAnalyzer(patterns)
 	analyzer.DryRun = dryRun
 
-	isTTY := term.IsTerminal(os.Stdout.Fd())
-
-	if isTTY {
+	if withTUI {
 		runProxyWithTUI(certPEM, keyPEM, analyzer, port, dryRun)
 	} else {
 		runProxyPlain(certPEM, keyPEM, analyzer, port, dryRun)
@@ -177,7 +177,7 @@ func runProxyWithTUI(certPEM, keyPEM []byte, analyzer *guardian.Analyzer, port i
 		close(events)
 	}()
 
-	if err := tui.Run(events, port, dryRun); err != nil {
+	if err := tui.Start(port, dryRun, events); err != nil {
 		fmt.Fprintf(os.Stderr, "[ERRO] TUI: %v\n", err)
 	}
 
@@ -185,7 +185,7 @@ func runProxyWithTUI(certPEM, keyPEM []byte, analyzer *guardian.Analyzer, port i
 	fmt.Println("[GALILEU] Log de auditoria persistido com sucesso.")
 }
 
-// runProxyPlain is the original plain-text mode used when stdout is not a TTY.
+// runProxyPlain is the headless mode — no TUI, plain text output.
 func runProxyPlain(certPEM, keyPEM []byte, analyzer *guardian.Analyzer, port int, dryRun bool) {
 	printBanner()
 
@@ -215,6 +215,6 @@ func printBanner() {
 ██║  ███╗███████║██║     ██║██║     █████╗  ██║   ██║
 ██║   ██║██╔══██║██║     ██║██║     ██╔══╝  ██║   ██║
 ╚██████╔╝██║  ██║███████╗██║███████╗███████╗╚██████╔╝
- ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚══════╝ ╚═════╝ 
+ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚══════╝ ╚═════╝
                                                       `)
 }
