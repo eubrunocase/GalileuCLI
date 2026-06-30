@@ -42,3 +42,7 @@ galileu
 galileu-demo.gif
 galileu-demo.mp4
 galileu-demo.tape
+# Environment files
+.env
+.env.local
+.env.*.local
