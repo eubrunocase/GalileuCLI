@@ -91,9 +91,51 @@ O Galileu funciona com qualquer ferramenta de AI que permita configurar um proxy
 
 ---
 
-## Instalação Rápida
+## Instalação
 
-Baixe o binário pré-compilado para a sua plataforma em
+### macOS / Linux — Homebrew (Recomendado)
+
+O método mais simples para instalar o Galileu no macOS e Linux é utilizando o [Homebrew](https://brew.sh/).
+
+**1. Adicione o tap do Galileu:**
+
+```bash
+brew tap eubrunocase/tap
+```
+
+**2. Instale o Galileu:**
+
+```bash
+brew install galileu
+```
+
+**3. Valide a instalação:**
+
+```bash
+galileu version
+galileu doctor
+```
+
+> Na primeira execução no macOS, será solicitada a senha do usuário para confiar no certificado CA local.
+
+#### Atualização
+
+Para atualizar para a versão mais recente:
+
+```bash
+brew upgrade galileu
+```
+
+#### Desinstalação
+
+```bash
+brew uninstall galileu
+brew untap eubrunocase/tap
+```
+
+### Binário Pré-compilado
+
+Caso prefira, baixe o binário para a sua plataforma em
 [Releases](https://github.com/eubrunocase/GalileuCLI/releases/latest):
 
 | Plataforma | Arquivo |
@@ -313,10 +355,11 @@ O binário `galileu` suporta os seguintes subcomandos:
 | Comando | Descrição |
 |---------|-----------|
 | `galileu` | Iniciar o proxy |
+| `galileu --tui` | Iniciar proxy com interface interativa (TUI) |
 | `galileu --dry-run` | Iniciar proxy em modo DRY-RUN (apenas detectar, não modificar) |
-| `make doctor` | Executar diagnóstico do sistema |
-| `make version` | Mostrar versão do binário |
-| `make help` | Mostrar ajuda |
+| `galileu --tui --dry-run` | TUI em modo DRY-RUN |
+| `galileu doctor` | Executar diagnóstico do sistema |
+| `galileu version` | Mostrar versão do binário |
 
 ### Modo DRY-RUN
 
@@ -358,6 +401,65 @@ Porta disponivel:    [OK] Livre
 
 Tudo OK!
 ```
+
+### Interface Interativa (TUI)
+
+O Galileu inclui uma **Terminal User Interface (TUI)** para monitorização e configuração em tempo real. A TUI é ativada com a flag `--tui`:
+
+```bash
+galileu --tui
+galileu --tui --dry-run
+```
+
+#### Ecrãs Disponíveis
+
+A TUI é composta por três ecrãs, navegáveis com atalhos de teclado:
+
+**1. Dashboard** (ecrã padrão)
+
+Painel de monitorização em tempo real com:
+
+- Estatísticas do proxy (porta, modo, hosts permitidos, padrões ativos)
+- Contadores de requisições totais, redactadas e erros
+- Registo de auditoria em tempo real (últimas requisições interceptadas)
+- Indicador de estado ("A CORRER") e badge "DRY-RUN" quando aplicável
+
+**2. Padrões de Detecção** (`P`)
+
+Gestão interativa dos padrões de detecção de dados sensíveis:
+
+- Lista de padrões **built-in** (OpenAI, Anthropic, Google, GitHub, Slack, Discord, AWS) com toggle ativar/desativar
+- Lista de padrões **customizados** com CRUD completo
+- Formulário inline para criar/editar padrões (regex ou literal)
+- Validação de regex em tempo real (borda verde = válido, vermelha = inválido)
+- Alterações são persistidas imediatamente no `galileu.yml`
+
+**3. Configuração do Proxy** (`C`)
+
+Formulário interativo para editar as configurações do proxy:
+
+- Porta (campo numérico validado)
+- Modo de operação (whitelist/passive)
+- Lista de hosts permitidos (adicionar/remover)
+- Lista de hosts ignorados (adicionar/remover)
+- Salvamento com confirmação de alterações não guardadas
+
+#### Atalhos de Teclado
+
+| Tecla | Ação |
+|-------|------|
+| `P` | Ecrã de Padrões |
+| `C` | Ecrã de Configuração do Proxy |
+| `Q` / `Ctrl+C` | Sair |
+| `B` / `Esc` | Voltar ao Dashboard |
+| `↑`/`↓` ou `k`/`j` | Navegar entre itens |
+| `Enter` / `Espaço` | Ativar/desativar ou editar item |
+| `N` | Criar novo padrão customizado |
+| `D` | Eliminar item selecionado |
+
+#### Requisitos da TUI
+
+A TUI utiliza a *alternate screen* do terminal e requer uma largura mínima de 80 colunas. É construída com [Bubble Tea](https://github.com/charmbracelet/bubbletea) e [Lipgloss](https://github.com/charmbracelet/lipgloss).
 
 ---
 
@@ -405,8 +507,10 @@ make build-linux        # Linux
 Após compilado, você pode executar o binário diretamente:
 
 ```bash
-./galileu               # iniciar proxy
+./galileu               # iniciar proxy (headless)
+./galileu --tui         # iniciar proxy com TUI interativa
 ./galileu --dry-run     # iniciar proxy em modo DRY-RUN
+./galileu --tui --dry-run # TUI em modo DRY-RUN
 ./galileu doctor        # verificar diagnóstico
 ./galileu version       # mostrar versão
 ./galileu -h            # mostrar ajuda
@@ -457,7 +561,8 @@ Galileu/
 ├── internal/
 │   ├── ca/                  # Geração e gestão do certificado CA
 │   ├── doctor/              # Diagnóstico do sistema
-│   └── guardian/            # Proxy MITM, Analyzer, Audit, instalação de certificado por plataforma
+│   ├── guardian/            # Proxy MITM, Analyzer, Audit, instalação de certificado por plataforma
+│   └── tui/                 # Interface interativa (Bubble Tea + Lipgloss)
 └── galileu_audit.log        # Registo de auditoria (gerado automaticamente na primeira execução)
 ```
 
@@ -911,8 +1016,8 @@ Consulte o ficheiro [SECURITY.md](SECURITY.md) para obter informações acerca d
 | ✅ | **Provider inference** | Provider inferido do payload automaticamente |
 | ✅ | **Wildcard matching** | Suporte a `*.openai.com`, `*.telemetry.*` |
 | ✅ | **Modo passive** | Para usar com Claude Code, Cursor, Windsurf |
-| 🔄 | **TUI (Terminal User Interface)** | Interface interativa para configuração e monitorização em tempo real |
-| 🔜 | **Instalação via Homebrew** | `brew install galileu` |
+| ✅ | **TUI (Terminal User Interface)** | Interface interativa para configuração e monitorização em tempo real |
+| ✅ | **Instalação via Homebrew** | `brew tap eubrunocase/tap && brew install galileu` |
 | 🔜 | **Plugin system** | Sistema de plugins para padrões customizados |
 
 ---
