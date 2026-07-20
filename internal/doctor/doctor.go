@@ -1,6 +1,7 @@
 package doctor
 
 import (
+	"Galileu/internal/guardian"
 	"fmt"
 	"net"
 	"os"
@@ -13,13 +14,24 @@ type DiagnosticResult struct {
 	PortAvailable        bool
 	EnvPortConfigured    bool
 	PortNumber           int
+	ConfigPath 		   	 string
+	ConfigSource 		 string
 	Errors               []string
 }
 
-func Diagnose() (*DiagnosticResult, error) {
+func Diagnose(configPath string) (*DiagnosticResult, error) {
 	result := &DiagnosticResult{
 		PortNumber: 9000,
 	}
+
+	config, err := guardian.ResolveConfigPath(configPath)
+	if err != nil {
+		result.Errors = append(result.Errors, err.Error())
+	} else {
+		result.ConfigPath = config.Path
+		result.ConfigSource = config.Source
+	}
+
 	if portEnv := os.Getenv("GALILEU_PORT"); portEnv != "" {
 		if port, err := fmt.Sscanf(portEnv, "%d", &result.PortNumber); port == 1 && err == nil {
 			result.EnvPortConfigured = true
@@ -33,6 +45,7 @@ func Diagnose() (*DiagnosticResult, error) {
 	}
 	return result, nil
 }
+
 func checkCertificate(result *DiagnosticResult) error {
 	certPath := filepath.Join("galileu-ca.pem")
 	if _, err := os.Stat(certPath); os.IsNotExist(err) {

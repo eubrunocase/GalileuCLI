@@ -53,6 +53,11 @@ type CompiledPattern struct {
 	Label string
 }
 
+type ConfigSource struct {
+	Path 	string
+	Source 	string
+}
+
 var builtInDefinitions = []struct {
 	enabledFn func(BuiltInConfig) bool
 	pattern   string
@@ -118,14 +123,15 @@ var builtInDefinitions = []struct {
 // ─── Função principal de carregamento ────────────────────────────────────────
 
 func LoadConfig(path string) (int, []CompiledPattern, error) {
+	if path == "" {
+		fmt.Println("[Galileu] galileu.yml não especificado. A usar padrões built-in por omissão.")
+		return 9000, compileBuiltIns(defaultBuiltInConfig()), nil
+	}
+
 	var cfg GalileuConfig
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Printf("[Galileu] galileu.yml não encontrado em '%s'. A usar padrões built-in por omissão.\n", path)
-			return 9000, compileBuiltIns(defaultBuiltInConfig()), nil
-		}
 		return 0, nil, fmt.Errorf("erro ao ler galileu.yml: %w", err)
 	}
 
@@ -183,6 +189,29 @@ func LoadConfig(path string) (int, []CompiledPattern, error) {
 	fmt.Printf("[Galileu] %d padrão(ões) de detecção carregado(s) a partir de '%s'.\n", len(compiled), path)
 	return port, compiled, nil
 }
+
+func ResolveConfigPath(flagPath string) (ConfigSource, error) {
+	// 1- Flag --config
+	if flagPath != "" {
+		if _, err := os.Stat(flagPath); os.IsNotExist(err) {
+			return ConfigSource{}, fmt.Errorf("Configuração explícita: arquivo '%s' não encontrado", flagPath)
+		} 
+		return ConfigSource{Path: flagPath, Source: "flag"}, nil
+	}
+	// 2- Env GALILEU_CONFIG
+	if env :=  os.Getenv("GALILEU_CONFIG"); env != "" {
+		if _, err := os.Stat(env); os.IsNotExist(err) {
+			return ConfigSource{}, fmt.Errorf("GALILEU_CONFIG: Arquivo '%s' não encontrado", env)
+		} 
+			return ConfigSource{Path: env, Source: "env"}, nil }
+	// 3- CWD galileu.yml
+	cwdPath := "galileu.yml"
+	if _, err := os.Stat(cwdPath); err == nil {
+		return ConfigSource{Path: cwdPath, Source: "cwd"}, nil
+	}
+	// 4- Built-in (sem arquivo)
+	return ConfigSource{Path: "", Source: "builtin"}, nil
+} 
 
 func loadProxyConfig(proxyCfg ProxySection) {
 	if proxyCfg.Mode != "" {

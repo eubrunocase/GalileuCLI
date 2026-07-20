@@ -10,7 +10,7 @@ import (
 // --- model.applyEvent ---
 
 func TestApplyEvent_IncrementsTotalOnNonSkipped(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	m = m.applyEvent(guardian.LogRequest{
 		Provider: "openai",
@@ -23,7 +23,7 @@ func TestApplyEvent_IncrementsTotalOnNonSkipped(t *testing.T) {
 }
 
 func TestApplyEvent_SkippedRequestNotCounted(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	m = m.applyEvent(guardian.LogRequest{Provider: "skipped"})
 
@@ -33,7 +33,7 @@ func TestApplyEvent_SkippedRequestNotCounted(t *testing.T) {
 }
 
 func TestApplyEvent_IncrementsRedactedCount(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	m = m.applyEvent(guardian.LogRequest{Provider: "anthropic", Redacted: true, PatternCount: 2})
 	m = m.applyEvent(guardian.LogRequest{Provider: "anthropic", Redacted: false})
@@ -44,7 +44,7 @@ func TestApplyEvent_IncrementsRedactedCount(t *testing.T) {
 }
 
 func TestApplyEvent_IncrementsErrorCount(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	m = m.applyEvent(guardian.LogRequest{Provider: "openai", ProxyError: true})
 
@@ -54,7 +54,7 @@ func TestApplyEvent_IncrementsErrorCount(t *testing.T) {
 }
 
 func TestApplyEvent_TracksProviders(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	m = m.applyEvent(guardian.LogRequest{Provider: "openai"})
 	m = m.applyEvent(guardian.LogRequest{Provider: "openai"})
@@ -69,7 +69,7 @@ func TestApplyEvent_TracksProviders(t *testing.T) {
 }
 
 func TestApplyEvent_UnknownProviderNotTracked(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	m = m.applyEvent(guardian.LogRequest{Provider: "unknown"})
 
@@ -79,7 +79,7 @@ func TestApplyEvent_UnknownProviderNotTracked(t *testing.T) {
 }
 
 func TestApplyEvent_EmptyProviderNotTracked(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	m = m.applyEvent(guardian.LogRequest{Provider: ""})
 
@@ -91,7 +91,7 @@ func TestApplyEvent_EmptyProviderNotTracked(t *testing.T) {
 // --- ring buffer ---
 
 func TestApplyEvent_RingBufferCapsAtMaxEvents(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	for i := 0; i < maxEvents+10; i++ {
 		m = m.applyEvent(guardian.LogRequest{Provider: "openai"})
@@ -103,7 +103,7 @@ func TestApplyEvent_RingBufferCapsAtMaxEvents(t *testing.T) {
 }
 
 func TestApplyEvent_SkippedNotAddedToEventList(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	m = m.applyEvent(guardian.LogRequest{Provider: "skipped"})
 
@@ -115,7 +115,7 @@ func TestApplyEvent_SkippedNotAddedToEventList(t *testing.T) {
 // --- View (dashboard) ---
 
 func TestView_ContainsPortInHeader(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 	m.width = 120
 	m.height = 30
 
@@ -127,7 +127,7 @@ func TestView_ContainsPortInHeader(t *testing.T) {
 }
 
 func TestView_ContainsDryRunBadgeWhenActive(t *testing.T) {
-	m := New(9000, true)
+	m := New(9000, true, "~/galileu.yml")
 	m.width = 120
 	m.height = 30
 
@@ -139,7 +139,7 @@ func TestView_ContainsDryRunBadgeWhenActive(t *testing.T) {
 }
 
 func TestView_NoDryRunBadgeWhenInactive(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 	m.width = 120
 	m.height = 30
 
@@ -151,7 +151,7 @@ func TestView_NoDryRunBadgeWhenInactive(t *testing.T) {
 }
 
 func TestView_EmptyStateShowsWaitingMessage(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 	m.width = 120
 	m.height = 30
 
@@ -165,7 +165,7 @@ func TestView_EmptyStateShowsWaitingMessage(t *testing.T) {
 // TestView_RedactedEventTrackedInStats verifies that a redacted event
 // increments stats correctly (adapted: badge text differs from original layout).
 func TestView_RedactedEventTrackedInStats(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 	m.width = 120
 	m.height = 40
 
@@ -184,7 +184,7 @@ func TestView_RedactedEventTrackedInStats(t *testing.T) {
 
 // TestView_CleanEventTrackedInStats verifies a clean (non-redacted) event increments Total.
 func TestView_CleanEventTrackedInStats(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 	m.width = 120
 	m.height = 40
 
@@ -204,7 +204,7 @@ func TestView_CleanEventTrackedInStats(t *testing.T) {
 
 // TestView_ProxyErrorTrackedInStats verifies proxy error increments Errors.
 func TestView_ProxyErrorTrackedInStats(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 	m.width = 120
 	m.height = 40
 
@@ -221,7 +221,7 @@ func TestView_ProxyErrorTrackedInStats(t *testing.T) {
 
 // TestView_DashboardContainsGalileuTitle verifies the title appears in the header.
 func TestView_DashboardContainsGalileuTitle(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 	m.width = 120
 	m.height = 30
 
@@ -235,7 +235,7 @@ func TestView_DashboardContainsGalileuTitle(t *testing.T) {
 // --- New ---
 
 func TestNew_InitialisesProviderMap(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	if m.stats.Providers == nil {
 		t.Error("expected Providers map to be initialised, got nil")
@@ -243,7 +243,7 @@ func TestNew_InitialisesProviderMap(t *testing.T) {
 }
 
 func TestNew_StoresPortAndDryRun(t *testing.T) {
-	m := New(1234, true)
+	m := New(1234, true, "~/galileu.yml")
 
 	if m.port != 1234 {
 		t.Errorf("expected port=1234, got %d", m.port)
@@ -255,7 +255,7 @@ func TestNew_StoresPortAndDryRun(t *testing.T) {
 
 // TestNew_DefaultsToScreenDashboard verifies initial screen is the dashboard.
 func TestNew_DefaultsToScreenDashboard(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	if m.currentScreen != screenDashboard {
 		t.Errorf("expected initial screen=screenDashboard, got %d", m.currentScreen)
@@ -264,7 +264,7 @@ func TestNew_DefaultsToScreenDashboard(t *testing.T) {
 
 // TestNavigateTo_SwitchesScreen verifies navigateTo changes currentScreen.
 func TestNavigateTo_SwitchesScreen(t *testing.T) {
-	m := New(9000, false)
+	m := New(9000, false, "~/galileu.yml")
 
 	nm, _ := m.navigateTo(screenProxy)
 

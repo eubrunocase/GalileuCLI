@@ -20,21 +20,23 @@ func main() {
 	dryRun := containsArg(args, "--dry-run")
 	useTUI := containsArg(args, "--tui")
 
+	configPath, args := extractFlagValue(os.Args[1:], "--config")
 	// Strip known flags before sub-command parsing.
 	filteredArgs := filterArgs(args, "--dry-run", "--tui")
 
 	if len(filteredArgs) == 0 {
-		runProxy(dryRun, useTUI)
+		runProxy(dryRun, useTUI, configPath)
 		return
 	}
 
+
 	switch filteredArgs[0] {
 	case "doctor":
-		runDoctor()
+		runDoctor(configPath)
 	case "version", "--version", "-v":
 		runVersion()
 	case "start":
-		runProxy(dryRun, useTUI)
+		runProxy(dryRun, useTUI, configPath)
 	case "-h", "--help", "help":
 		printHelp()
 	default:
@@ -58,6 +60,19 @@ func filterArgs(args []string, exclude ...string) []string {
 	return result
 }
 
+func extractFlagValue(args []string, flag string) (string, []string) {
+	for i, a := range args {
+		if a == flag && i+1 < len(args) {
+			value := args[i+1]
+			result := make([]string, 0, len(args)-2)
+			result = append(result, args[:i]...)
+			result = append(result, args[i+2:]...)
+			return value, result
+		}
+	}
+	return "", args
+}
+
 func containsArg(args []string, arg string) bool {
 	for _, a := range args {
 		if a == arg {
@@ -71,26 +86,31 @@ func printHelp() {
 	fmt.Println(`Galileu - Proxy de Segurança para LLMs
 
 Uso:
-  galileu               Iniciar o proxy (modo headless)
-  galileu --tui         Iniciar o proxy com interface interactiva
-  galileu --dry-run     Iniciar proxy em modo DRY-RUN (apenas detectar, não modificar)
-  galileu doctor        Executar diagnóstico do sistema
-  galileu version       Mostrar versão do binário
+  galileu                     Iniciar o proxy (modo headless)
+  galileu --tui               Iniciar o proxy com interface interactiva
+  galileu --dry-run           Iniciar proxy em modo DRY-RUN (apenas detectar, não modificar)
+  galileu doctor              Executar diagnóstico do sistema
+  galileu version       	  Mostrar versão do binário
+  galileu --config <path>     Usar arquivo de configuracao especifico
+
+  Variaveis de ambiente:
+  GALILEU_CONFIG              Caminho para o arquivo de configuracao
+  GALILEU_PORT                Porta do proxy (usado pelo doctor)
 
 Exemplos:
-  galileu               Inicia o proxy na porta 9000
-  galileu --tui         Inicia proxy com TUI interactiva
-  galileu --dry-run     Inicia proxy em modo teste
-  galileu doctor        Verifica certificado, porta e variáveis
-  galileu -h            Mostra esta ajuda`)
+  galileu                         				Inicia o proxy na porta 9000
+  galileu --config /etc/galileu/team.yml   		Config de equipe
+  GALILEU_CONFIG=~/.config/galileu.yml galileu  Via variavel de ambiente
+  galileu doctor                  				Verifica certificado, porta e variaveis
+  galileu -h  									Mostra esta ajuda`)
 }
 
 func runVersion() {
 	fmt.Printf("Galileu v%s\n", version)
 }
 
-func runDoctor() {
-	result, err := doctor.Diagnose()
+func runDoctor(configPath string) {
+	result, err := doctor.Diagnose(configPath)
 	if err != nil {
 		fmt.Printf("[ERRO] %v\n", err)
 		os.Exit(1)
@@ -119,6 +139,18 @@ func runDoctor() {
 		fmt.Println("[FALHA] Ja em uso")
 	}
 
+	fmt.Printf("Config ativa: 	  ")
+	switch result.ConfigSource {
+	case "flag":
+		fmt.Printf("[OK] %s (via --config)\n", result.ConfigPath)
+	case "env":
+		fmt.Printf("[OK] %s (via GALILEU_CONFIG)\n", result.ConfigPath)
+	case "cwd":
+		fmt.Printf("[OK] %s (CWD)\n", result.ConfigPath)
+	case "builtin":
+		fmt.Println("[OK] padroes built-in (nenhum arquivo)")
+	}
+
 	fmt.Println("")
 
 	if len(result.Errors) > 0 {
@@ -132,8 +164,16 @@ func runDoctor() {
 	fmt.Println("Tudo OK!")
 }
 
-func runProxy(dryRun, withTUI bool) {
+func runProxy(dryRun, withTUI bool, configFlag string) {
 	certPath, keyPath := ca.ResolvePaths(ca.CertFile, ca.KeyFile)
+
+	config, err := guardian.ResolveConfigPath(configFlag)
+	if err != nil {
+		fmt.Printf("[ERRO] Falha ao resolver configuração: %v\n", err)
+		os.Exit(1)
+	}
+
+	logConfigSource(config)
 
 	certPEM, keyPEM, err := ca.EnsureCA(certPath, keyPath)
 	if err != nil {
@@ -145,7 +185,7 @@ func runProxy(dryRun, withTUI bool) {
 		fmt.Printf("[AVISO] %v\n", err)
 	}
 
-	port, patterns, err := guardian.LoadConfig("galileu.yml")
+	port, patterns, err := guardian.LoadConfig(config.Path)
 	if err != nil {
 		fmt.Printf("[ERRO] Falha ao carregar configuração: %v\n", err)
 		os.Exit(1)
@@ -154,14 +194,14 @@ func runProxy(dryRun, withTUI bool) {
 	analyzer.DryRun = dryRun
 
 	if withTUI {
-		runProxyWithTUI(certPEM, keyPEM, analyzer, port, dryRun)
+		runProxyWithTUI(certPEM, keyPEM, analyzer, port, dryRun, config.Path)
 	} else {
 		runProxyPlain(certPEM, keyPEM, analyzer, port, dryRun)
 	}
 }
 
 // runProxyWithTUI starts the proxy and drives the interactive TUI.
-func runProxyWithTUI(certPEM, keyPEM []byte, analyzer *guardian.Analyzer, port int, dryRun bool) {
+func runProxyWithTUI(certPEM, keyPEM []byte, analyzer *guardian.Analyzer, port int, dryRun bool, configPath string) {
 	// Buffered channel: proxy goroutine never blocks on a slow TUI render.
 	events := make(chan guardian.LogRequest, 128)
 
@@ -177,7 +217,7 @@ func runProxyWithTUI(certPEM, keyPEM []byte, analyzer *guardian.Analyzer, port i
 		close(events)
 	}()
 
-	if err := tui.Start(port, dryRun, events); err != nil {
+	if err := tui.Start(port, dryRun, events, configPath); err != nil {
 		fmt.Fprintf(os.Stderr, "[ERRO] TUI: %v\n", err)
 	}
 
@@ -206,6 +246,19 @@ func runProxyPlain(certPEM, keyPEM []byte, analyzer *guardian.Analyzer, port int
 	guardian.CloseGuardian()
 	guardian.CloseAuditLogger()
 	fmt.Println("[GALILEU] Log de auditoria persistido com sucesso.")
+}
+
+func logConfigSource(config guardian.ConfigSource) {
+	switch config.Source {
+    case "flag":
+        fmt.Printf("[GALILEU] config: usando --config=%s\n", config.Path)
+    case "env":
+        fmt.Printf("[GALILEU] config: usando GALILEU_CONFIG=%s\n", config.Path)
+    case "cwd":
+        fmt.Printf("[GALILEU] config: usando %s (CWD)\n", config.Path)
+    case "builtin":
+        fmt.Println("[GALILEU] config: nenhum arquivo encontrado, usando padroes built-in")
+    }
 }
 
 func printBanner() {

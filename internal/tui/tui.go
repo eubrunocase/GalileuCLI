@@ -8,8 +8,8 @@ import (
 
 // Start launches the Bubble Tea program with the proxy event channel.
 // It blocks until the user quits.
-func Start(port int, dryRun bool, events <-chan guardian.LogRequest) error {
-	m := New(port, dryRun)
+func Start(port int, dryRun bool, events <-chan guardian.LogRequest, configPath string) error {
+	m := New(port, dryRun, configPath)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	// Forward proxy events into bubbletea.

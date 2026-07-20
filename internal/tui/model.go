@@ -73,7 +73,7 @@ type model struct {
 }
 
 // New returns the initial model.
-func New(port int, dryRun bool) model {
+func New(port int, dryRun bool, configPath string) model {
 	return model{
 		currentScreen: screenDashboard,
 		port:          port,
@@ -81,7 +81,7 @@ func New(port int, dryRun bool) model {
 		startAt:       time.Now(),
 		stats:         Stats{Providers: make(map[string]int)},
 		events:        make([]guardian.LogRequest, 0, maxEvents),
-		configPath:    "galileu.yml",
+		configPath:    configPath,
 	}
 }
 

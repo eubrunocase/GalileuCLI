@@ -166,6 +166,90 @@ func TestSaveConfig_RoundTripPreservesCustomPatterns(t *testing.T) {
 	}
 }
 
+// ─── ResolveConfigPath ──────────────────────────────────────────────────────
+func TestResolveConfigPath_FlagTakesPrecedence(t *testing.T) {
+	dir := t.TempDir()
+	flagPath := filepath.Join(dir, "team.yml")
+	os.WriteFile(flagPath, []byte("port: 8080"), 0o644)
+	t.Setenv("GALILEU_CONFIG", "/some/env/path.yml")
+	cfg, err := ResolveConfigPath(flagPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Source != "flag" {
+		t.Errorf("expected source 'flag', got %q", cfg.Source)
+	}
+	if cfg.Path != flagPath {
+		t.Errorf("expected path %q, got %q", flagPath, cfg.Path)
+	}
+}
+func TestResolveConfigPath_EnvFallback(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, "env-config.yml")
+	os.WriteFile(envPath, []byte("port: 7070"), 0o644)
+	t.Setenv("GALILEU_CONFIG", envPath)
+	cfg, err := ResolveConfigPath("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Source != "env" {
+		t.Errorf("expected source 'env', got %q", cfg.Source)
+	}
+	if cfg.Path != envPath {
+		t.Errorf("expected path %q, got %q", envPath, cfg.Path)
+	}
+}
+func TestResolveConfigPath_CWDFallback(t *testing.T) {
+	dir := t.TempDir()
+	cwdPath := filepath.Join(dir, "galileu.yml")
+	os.WriteFile(cwdPath, []byte("port: 6060"), 0o644)
+	// Salvar e restaurar CWD original
+	origDir, _ := os.Getwd()
+	defer t.Chdir(origDir)
+	t.Chdir(dir)
+	t.Setenv("GALILEU_CONFIG", "")
+	cfg, err := ResolveConfigPath("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Source != "cwd" {
+		t.Errorf("expected source 'cwd', got %q", cfg.Source)
+	}
+	if cfg.Path != "galileu.yml" {
+		t.Errorf("expected path 'galileu.yml', got %q", cfg.Path)
+	}
+}
+func TestResolveConfigPath_BuiltinFallback(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(dir)
+	t.Setenv("GALILEU_CONFIG", "")
+	cfg, err := ResolveConfigPath("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Source != "builtin" {
+		t.Errorf("expected source 'builtin', got %q", cfg.Source)
+	}
+	if cfg.Path != "" {
+		t.Errorf("expected empty path for builtin, got %q", cfg.Path)
+	}
+}
+func TestResolveConfigPath_FlagNonexistent(t *testing.T) {
+	_, err := ResolveConfigPath("/nonexistent/path/config.yml")
+	if err == nil {
+		t.Error("expected error for nonexistent --config path")
+	}
+}
+func TestResolveConfigPath_EnvNonexistent(t *testing.T) {
+	t.Setenv("GALILEU_CONFIG", "/nonexistent/env-config.yml")
+	_, err := ResolveConfigPath("")
+	if err == nil {
+		t.Error("expected error for nonexistent GALILEU_CONFIG path")
+	}
+}
+
 // ─── helper ───────────────────────────────────────────────────────────────────
 
 func writeTemp(t *testing.T, content string) string {
